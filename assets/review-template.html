@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>客户资料确认</title>
+  <style>
+    :root { --ink:#142d34; --text:#263e45; --muted:#657a80; --line:#d9e3e4; --paper:#f4f7f7; --green:#006a64; --soft:#e7f3f0; --amber:#8a5219; --danger:#ad352c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--text); font-family:Inter,"Microsoft YaHei","PingFang SC",sans-serif; font-size:15px; line-height:1.65; }
+    button,input,textarea,select { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.42; }
+    button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid #58b5ad; outline-offset:3px; }
+    button { touch-action:manipulation; }
+    [hidden] { display:none !important; }
+    .top { background:#fff; border-bottom:1px solid var(--line); }
+    .top-inner { max-width:1460px; margin:auto; padding:22px 32px 18px; display:flex; justify-content:space-between; gap:24px; align-items:center; }
+    .brandline { margin:0 0 3px; color:var(--muted); font-size:13px; }
+    h1 { font-size:25px; line-height:1.4; margin:0; color:var(--ink); font-weight:650; }
+    .top-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn { padding:10px 17px; border:1px solid #b9caca; border-radius:8px; background:#fff; color:var(--ink); font-weight:600; min-height:44px; }
+    .btn:hover { background:#f0f7f5; }
+    .btn.primary { background:var(--green); color:#fff; border-color:var(--green); }
+    .btn.primary:hover { background:#005852; }
+    .btn.quiet { border-color:transparent; background:transparent; color:var(--green); padding-left:9px; padding-right:9px; }
+    .intro { max-width:1460px; margin:auto; padding:18px 32px 0; }
+    .intro p { margin:0; max-width:900px; }
+    .intro .sub { color:var(--muted); font-size:13px; margin-top:6px; }
+    .layout { max-width:1460px; margin:auto; padding:24px 32px 36px; display:grid; grid-template-columns:230px minmax(0,1fr); gap:28px; align-items:start; }
+    .rail { position:sticky; top:20px; }
+    .progress-label { display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; font-size:14px; }
+    progress { appearance:none; width:100%; height:5px; border:0; display:block; background:#d9e7e4; border-radius:8px; }
+    progress::-webkit-progress-bar { background:#d9e7e4; border-radius:8px; }
+    progress::-webkit-progress-value { background:var(--green); border-radius:8px; }
+    progress::-moz-progress-bar { background:var(--green); }
+    .save-state { margin:8px 0 17px; font-size:12px; color:var(--muted); }
+    .navlist { display:grid; gap:3px; max-height:68vh; overflow:auto; padding-right:7px; }
+    .navitem { display:grid; grid-template-columns:23px 1fr 16px; gap:7px; text-align:left; align-items:center; border:0; background:transparent; padding:9px 8px; border-radius:7px; color:var(--muted); line-height:1.4; width:100%; font-size:13px; }
+    .navitem:hover { background:#edf2f1; }
+    .navitem[aria-current="step"] { background:var(--soft); color:var(--green); font-weight:600; }
+    .navitem .num { font-variant-numeric:tabular-nums; color:var(--muted); }
+    .navitem .mark { font-size:13px; color:var(--green); text-align:center; }
+    .mobile-nav { display:none; }
+    main { min-width:0; }
+    .review { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    .issue-head { padding:25px 28px 19px; border-bottom:1px solid var(--line); }
+    .eyebrow { color:var(--green); font-size:13px; margin:0 0 5px; font-weight:600; }
+    h2 { color:var(--ink); font-size:23px; line-height:1.45; margin:0 0 9px; font-weight:650; }
+    .question { margin:0; max-width:940px; }
+    .issue-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(310px,.9fr); }
+    .evidence { padding:23px 25px 25px; background:#fbfcfc; border-right:1px solid var(--line); min-width:0; }
+    .section-label { font-size:14px; font-weight:650; margin:0 0 10px; color:var(--ink); }
+    .values { width:100%; border-collapse:collapse; margin-bottom:16px; font-size:14px; background:#fff; }
+    .values th,.values td { padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; overflow-wrap:anywhere; }
+    .values th { width:43%; font-weight:500; color:var(--muted); }
+    .values td { font-weight:600; color:var(--ink); }
+    .source-meta { margin:0 0 16px; padding:11px 13px; background:#fff; border:1px solid var(--line); border-radius:8px; display:grid; gap:6px; font-size:13px; }
+    .source-meta-row { display:grid; grid-template-columns:112px minmax(0,1fr); gap:8px; align-items:baseline; }
+    .source-meta dt { color:var(--muted); font-weight:500; }
+    .source-meta dd { margin:0; color:var(--ink); overflow-wrap:anywhere; word-break:break-word; }
+    .source-meta .source-path { font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace; font-size:12.5px; }
+    .figure-hint { margin:0 0 12px; color:var(--muted); font-size:12px; }
+    figure { margin:0 0 16px; }
+    figure:last-child { margin-bottom:0; }
+    .image-button { display:block; padding:0; border:1px solid #ccd9d9; border-radius:7px; overflow:hidden; background:#fff; width:100%; }
+    .image-button:hover { border-color:var(--green); }
+    .image-button img { display:block; width:100%; height:auto; }
+    figcaption { font-size:12px; color:var(--muted); margin-top:6px; overflow-wrap:anywhere; }
+    .answers { padding:23px 25px 25px; min-width:0; }
+    fieldset { border:0; padding:0; margin:0; min-width:0; }
+    legend { padding:0; }
+    .choices { display:grid; gap:9px; }
+    .choice { display:grid; grid-template-columns:18px 1fr; gap:10px; align-items:start; padding:12px 13px; border:1px solid var(--line); border-radius:8px; cursor:pointer; }
+    .choice:hover { border-color:#84b9b1; background:#f8fcfa; }
+    .choice:has(input:checked) { border-color:var(--green); background:var(--soft); }
+    .choice input { margin:5px 0 0; accent-color:var(--green); width:16px; height:16px; }
+    .choice-title { display:block; font-weight:600; color:var(--ink); line-height:1.5; }
+    .choice-detail { display:block; color:var(--muted); font-size:12px; line-height:1.6; margin-top:2px; }
+    .corrections { padding-top:17px; }
+    .field { display:block; margin:0 0 12px; font-size:13px; font-weight:550; }
+    .field input,.field textarea { width:100%; margin-top:5px; display:block; padding:10px 11px; border:1px solid #bccdce; border-radius:7px; color:var(--ink); background:#fff; font-weight:400; font-size:14px; }
+    .field textarea { resize:vertical; min-height:82px; line-height:1.6; }
+    .field input::placeholder,.field textarea::placeholder { color:#7e9195; }
+    .field .optional { font-weight:400; color:var(--muted); }
+    .detail-note { border-top:1px solid var(--line); margin-top:17px; padding-top:15px; }
+    .detail-note summary { color:var(--green); cursor:pointer; font-size:13px; }
+    .detail-note .field { margin-top:12px; }
+    .error { color:var(--danger); font-size:13px; margin:12px 0 0; padding:10px; background:#fff1ed; border-radius:6px; }
+    .issue-footer { padding:15px 25px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:15px; }
+    .issue-counter { color:var(--muted); font-size:13px; }
+    .pager { display:flex; gap:9px; }
+    .reference { margin:12px 3px 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .summary-view { background:#fff; border:1px solid var(--line); border-radius:12px; padding:26px; }
+    .summary-view h2 { margin-bottom:6px; }
+    .reviewer-fields { display:grid; grid-template-columns:1fr 1fr; gap:15px; max-width:650px; margin:20px 0 10px; }
+    .summary-intro { color:var(--muted); margin:0; }
+    .summary-table { width:100%; border-collapse:collapse; margin:17px 0 20px; font-size:14px; }
+    .summary-table th { text-align:left; font-size:12px; color:var(--muted); font-weight:500; }
+    .summary-table th,.summary-table td { padding:12px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+    .summary-table td:first-child { width:45%; }
+    .summary-table button { border:0; background:transparent; text-align:left; color:var(--green); padding:0; line-height:1.5; }
+    .summary-small { display:block; font-size:12px; color:var(--muted); margin-top:3px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .download-actions { display:flex; gap:9px; flex-wrap:wrap; }
+    .return-help { margin:14px 0 0; color:var(--muted); font-size:13px; }
+    .toast { position:fixed; right:25px; bottom:24px; max-width:min(510px,calc(100% - 32px)); background:var(--ink); color:#fff; border-radius:9px; padding:13px 18px; z-index:50; box-shadow:0 5px 20px #102b3428; font-size:14px; }
+    dialog { border:0; border-radius:10px; max-width:min(96vw,1450px); max-height:94vh; padding:0; box-shadow:0 12px 50px #001a3d55; background:#fff; }
+    dialog::backdrop { background:#122e38ad; }
+    .modal-bar { padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); }
+    .modal-bar p { margin:0; font-size:13px; }
+    .zoom-area { overflow:auto; max-height:80vh; padding:16px; }
+    .zoom-area img { display:block; width:auto; max-width:none; height:auto; }
+    .empty-state { padding:24px; }
+    .no-script { max-width:900px; padding:25px; margin:25px auto; background:#fff; }
+    @media (min-width:1400px) { .issue-body { grid-template-columns:minmax(0,1.35fr) minmax(340px,.9fr); } }
+    @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:18px; padding-left:22px; padding-right:22px; } .issue-body { grid-template-columns:1fr; } .evidence { border-right:0; border-bottom:1px solid var(--line); } .answers { padding:22px 25px; } .choices { grid-template-columns:1fr 1fr; } .issue-head { padding:22px 25px 18px; } }
+    @media (max-width:700px) { body { font-size:14px; } .top-inner { padding:19px 16px 15px; flex-direction:column; align-items:stretch; gap:14px; } h1 { font-size:23px; } .top-actions { justify-content:space-between; } .top-actions .btn { flex:1; padding:10px 9px; } .intro { padding:15px 16px 0; } .intro .sub { font-size:12px; } .layout { display:block; padding:17px 12px 30px; } .rail { position:static; margin:0 5px 16px; } .navlist { display:none; } .save-state { margin-bottom:10px; } .mobile-nav { display:block; width:100%; padding:10px; border:1px solid #b9caca; border-radius:7px; color:var(--ink); background:#fff; font-size:14px; } h2 { font-size:21px; } .issue-head { padding:19px 18px 17px; } .evidence,.answers { padding:18px 17px; } .source-meta-row { grid-template-columns:1fr; gap:2px; } .choices { grid-template-columns:1fr; } .choice { padding:12px; } .choice-detail { font-size:13px; } .field input,.field textarea { font-size:16px; } .issue-footer { padding:13px 15px; gap:8px; } .pager { gap:7px; } .pager .btn { padding:9px 13px; } .issue-counter { font-size:12px; } .summary-view { padding:21px 17px; } .reviewer-fields { grid-template-columns:1fr; gap:0; } .summary-table { font-size:13px; } .summary-table td:first-child { width:48%; } .summary-table th,.summary-table td { padding:11px 5px; } .summary-table th:last-child { width:25%; } .zoom-area { padding:10px; } .toast { right:16px; bottom:16px; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div><p class="brandline" id="brandline"></p><h1>客户资料确认</h1></div>
+      <div class="top-actions">
+        <button type="button" class="btn" id="summary-button">检查填写结果</button>
+        <button type="button" class="btn primary" id="export-top">导出反馈</button>
+      </div>
+    </div>
+  </header>
+  <div class="intro">
+    <p id="instructions">请看图中标亮的内容，选择怎么处理。需要修改时填写正确值。完成后导出反馈并发回给我们。</p>
+    <p class="sub">进度自动保存在当前浏览器。换设备继续填写，请导出并导入 JSON。CSV 适合提交反馈或导入知识库流程。</p>
+  </div>
+  <div class="layout">
+    <aside class="rail" aria-label="确认事项导航">
+      <div class="progress-label"><span id="progress-label">已反馈 0 / 0 项</span><span id="progress-percent">0%</span></div>
+      <progress id="progress" value="0" max="1" aria-label="填写进度"></progress>
+      <p class="save-state" id="save-state">填写后自动保存在此浏览器</p>
+      <select id="mobile-nav" class="mobile-nav" aria-label="切换确认事项"></select>
+      <nav id="navlist" class="navlist" aria-label="确认事项"></nav>
+    </aside>
+    <main>
+      <section class="review" id="review-view" aria-labelledby="issue-title">
+        <div class="issue-head">
+          <p class="eyebrow" id="product"></p>
+          <h2 id="issue-title" tabindex="-1"></h2>
+          <p class="question" id="question"></p>
+        </div>
+        <div class="issue-body">
+          <section class="evidence" aria-label="原件内容">
+            <p class="section-label">原件中的写法</p>
+            <table class="values" aria-label="待确认的原件参数"><tbody id="original-values"></tbody></table>
+            <dl class="source-meta" id="source-meta" aria-label="来源文件信息"></dl>
+            <p class="figure-hint">重点已用黄色标出，点击图片可放大查看。</p>
+            <div id="evidence-images"></div>
+          </section>
+          <form id="answer-form" class="answers" novalidate>
+            <fieldset><legend class="section-label">请选择处理方式</legend><div id="choices" class="choices"></div></fieldset>
+            <div class="corrections" id="corrections" hidden>
+              <p class="section-label">请填写确认后的内容</p><div id="correction-fields"></div>
+              <p class="figure-hint">如有新版规格书，也可在此说明，并将新版文件与反馈一起发回。</p>
+            </div>
+            <details class="detail-note" id="additional-details">
+              <summary>补充适用型号或说明（选填）</summary>
+              <label class="field">适用型号 / 配置<input id="applicability" type="text" maxlength="2000" placeholder="这项结论适用于哪些型号或配置"></label>
+              <label class="field">补充说明<textarea id="note" rows="3" maxlength="10000" placeholder="如需内部确认，可填写负责人或预计回复时间"></textarea></label>
+            </details>
+            <p class="error" id="answer-error" role="alert" hidden></p>
+          </form>
+        </div>
+        <div class="issue-footer">
+          <span id="issue-counter" class="issue-counter"></span>
+          <div class="pager"><button class="btn" type="button" id="previous">上一项</button><button class="btn primary" type="button" id="next">下一项</button></div>
+        </div>
+      </section>
+      <p id="reference" class="reference"></p>
+      <section id="summary-view" class="summary-view" aria-labelledby="summary-title" hidden>
+        <h2 id="summary-title" tabindex="-1">检查并导出反馈</h2>
+        <p id="summary-description" class="summary-intro"></p>
+        <div class="reviewer-fields">
+          <label class="field">填写人 <span class="optional">（选填）</span><input id="reviewer-name" type="text" autocomplete="name" maxlength="200" placeholder="您的姓名"></label>
+          <label class="field">部门 / 职务 <span class="optional">（选填）</span><input id="reviewer-team" type="text" maxlength="200" placeholder="例如产品部"></label>
+        </div>
+        <table class="summary-table"><thead><tr><th>确认事项</th><th>您的意见</th><th>填写情况</th></tr></thead><tbody id="summary-rows"></tbody></table>
+        <div class="download-actions">
+          <button class="btn primary" type="button" id="export-bottom">导出反馈文件</button>
+          <button class="btn" type="button" id="export-csv">导出表格</button>
+          <button class="btn quiet" type="button" id="import-button">导入已填反馈</button>
+        </div>
+        <p class="return-help">导出后，把下载的反馈文件发回给我们。有新版规格书时请一并发送。未填完也可先导出。</p>
+      </section>
+    </main>
+  </div>
+  <input id="import-file" type="file" accept="application/json,.json" hidden>
+  <dialog id="image-dialog" aria-label="放大原件截图"><div class="modal-bar"><p id="image-caption"></p><button type="button" class="btn" id="image-close">关闭</button></div><div class="zoom-area"><img id="zoom-image" alt=""></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="no-script">请在 Chrome、Edge 或其他支持 JavaScript 的浏览器中打开此文件，以查看截图并填写反馈。</p></noscript>
+  <script id="review-data" type="application/json">__REVIEW_DATA__</script>
+  <script>
+    'use strict';
+    const data = JSON.parse(document.getElementById('review-data').textContent);
+    const byId = new Map(data.issues.map(item => [item.id, item]));
+    const storageKey = 'customer-review:' + data.projectId + ':' + data.revision;
+    const feedbackSchema = 'customer-feedback.v1';
+    const $ = id => document.getElementById(id);
+    const freshAnswer = () => ({ decision:'', values:{}, applicability:'', note:'', updatedAt:'' });
+    let answers = Object.fromEntries(data.issues.map(item => [item.id, freshAnswer()]));
+    let reviewer = { name:'', team:'' };
+    let currentIndex = 0;
+    let showingSummary = false;
+    let storageAvailable = true;
+    let toastTimer;
+
+    function textElement(tag, text, className) {
+      const element = document.createElement(tag);
+      element.textContent = text;
+      if (className) element.className = className;
+      return element;
+    }
+
+    function cleanAnswer(item, input) {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return freshAnswer();
+      const answer = freshAnswer();
+      if (item.choices.some(choice => choice.value === input.decision)) answer.decision = input.decision;
+      for (const field of item.fields) {
+        const value = input.values && input.values[field.key];
+        if (typeof value === 'string') answer.values[field.key] = value.slice(0, 10000);
+      }
+      if (typeof input.applicability === 'string') answer.applicability = input.applicability.slice(0, 2000);
+      if (typeof input.note === 'string') answer.note = input.note.slice(0, 10000);
+      if (typeof input.updatedAt === 'string') answer.updatedAt = input.updatedAt.slice(0, 80);
+      return answer;
+    }
+
+    function restore() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        if (!stored || stored.revision !== data.revision) return;
+        for (const item of data.issues) answers[item.id] = cleanAnswer(item, stored.answers && stored.answers[item.id]);
+        reviewer.name = typeof stored.reviewer?.name === 'string' ? stored.reviewer.name.slice(0, 200) : '';
+        reviewer.team = typeof stored.reviewer?.team === 'string' ? stored.reviewer.team.slice(0, 200) : '';
+        const index = data.issues.findIndex(item => item.id === stored.currentId);
+        if (index >= 0) currentIndex = index;
+      } catch (error) {
+        storageAvailable = false;
+      }
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ revision:data.revision, answers, reviewer, currentId:data.issues[currentIndex].id }));
+        storageAvailable = true;
+        $('save-state').textContent = '进度已保存在此浏览器';
+      } catch (error) {
+        storageAvailable = false;
+        $('save-state').textContent = '此浏览器无法暂存，请及时导出反馈';
+      }
+      updateProgress();
+    }
+
+    function needsCorrection(item, answer) {
+      return answer.decision === 'revise' || item.choices.some(choice => choice.value === answer.decision && choice.requiresCorrection === true);
+    }
+
+    function answerError(item, answer) {
+      if (!answer.decision) return '';
+      if (needsCorrection(item, answer) && !item.fields.some(field => (answer.values[field.key] || '').trim())) {
+        return '请至少填写一项正确参数，或说明将另附哪份新版规格书。';
+      }
+      return '';
+    }
+
+    function isComplete(item) {
+      const answer = answers[item.id];
+      return Boolean(answer.decision) && !answerError(item, answer);
+    }
+
+    function updateProgress() {
+      const count = data.issues.filter(isComplete).length;
+      $('progress-label').textContent = '已反馈 ' + count + ' / ' + data.issues.length + ' 项';
+      $('progress-percent').textContent = Math.round(100 * count / data.issues.length) + '%';
+      $('progress').max = data.issues.length;
+      $('progress').value = count;
+      for (const button of $('navlist').children) {
+        const item = byId.get(button.dataset.id);
+        const mark = button.querySelector('.mark');
+        mark.textContent = isComplete(item) ? '✓' : '';
+        button.setAttribute('aria-current', !showingSummary && item.id === data.issues[currentIndex].id ? 'step' : 'false');
+      }
+      for (const option of $('mobile-nav').options) {
+        const item = byId.get(option.value);
+        option.textContent = (isComplete(item) ? '✓ ' : '') + (data.issues.indexOf(item) + 1) + '. ' + item.product;
+      }
+    }
+
+    function buildNavigation() {
+      for (const [index, item] of data.issues.entries()) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'navitem';
+        button.dataset.id = item.id;
+        button.append(textElement('span', String(index + 1).padStart(2, '0'), 'num'));
+        button.append(textElement('span', item.product));
+        button.append(textElement('span', '', 'mark'));
+        button.addEventListener('click', () => showIssue(index, true));
+        $('navlist').append(button);
+        const option = document.createElement('option');
+        option.value = item.id;
+        $('mobile-nav').append(option);
+      }
+    }
+
+    function updateCorrectionVisibility() {
+      const item = data.issues[currentIndex];
+      $('corrections').hidden = !needsCorrection(item, answers[item.id]);
+    }
+
+    function showIssue(index, focus=false) {
+      currentIndex = Math.max(0, Math.min(data.issues.length - 1, index));
+      showingSummary = false;
+      const item = data.issues[currentIndex];
+      const answer = answers[item.id];
+      $('review-view').hidden = false;
+      $('reference').hidden = false;
+      $('summary-view').hidden = true;
+      $('product').textContent = item.product;
+      $('issue-title').textContent = item.title;
+      $('question').textContent = item.question;
+      $('reference').textContent = '事项编号 ' + item.id + ' · ' + item.evidence.map(e => e.caption).join(' / ');
+      $('original-values').replaceChildren();
+      for (const [label, value] of item.originalValues) {
+        const row = document.createElement('tr');
+        const heading = textElement('th', label);
+        heading.scope = 'row';
+        row.append(heading, textElement('td', value));
+        $('original-values').append(row);
+      }
+      $('source-meta').replaceChildren();
+      const sourceEntries = [['原文件名', item.sourceName, false]];
+      if (item.sourcePath) {
+        sourceEntries.push(['初筛包位置', item.sourcePath, true]);
+        sourceEntries.push(['具体位置', item.sourceLocation, false]);
+      } else {
+        sourceEntries.push(['初筛包位置', item.sourceLocation, true]);
+      }
+      for (const [label, value, isPath] of sourceEntries) {
+        if (!value) continue;
+        const row = document.createElement('div');
+        row.className = 'source-meta-row';
+        row.append(textElement('dt', label), textElement('dd', value, isPath ? 'source-path' : ''));
+        $('source-meta').append(row);
+      }
+      $('evidence-images').replaceChildren();
+      for (const evidence of item.evidence) {
+        const figure = document.createElement('figure');
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'image-button';
+        button.setAttribute('aria-label', '放大查看 ' + evidence.caption);
+        const image = document.createElement('img');
+        image.src = evidence.image; image.alt = evidence.caption + '，黄色区域为待确认内容';
+        if (Number.isFinite(evidence.width) && evidence.width > 0) image.width = evidence.width;
+        if (Number.isFinite(evidence.height) && evidence.height > 0) image.height = evidence.height;
+        button.append(image);
+        button.addEventListener('click', () => showImage(evidence, image));
+        figure.append(button, textElement('figcaption', evidence.caption));
+        $('evidence-images').append(figure);
+      }
+      $('choices').replaceChildren();
+      for (const choice of item.choices) {
+        const label = document.createElement('label'); label.className = 'choice';
+        const input = document.createElement('input');
+        input.type = 'radio'; input.name = 'decision'; input.value = choice.value; input.checked = choice.value === answer.decision;
+        const text = document.createElement('span');
+        text.append(textElement('span', choice.label, 'choice-title'), textElement('span', choice.detail, 'choice-detail'));
+        label.append(input, text);
+        input.addEventListener('change', () => {
+          answer.decision = choice.value; answer.updatedAt = new Date().toISOString();
+          $('answer-error').hidden = true; updateCorrectionVisibility(); save();
+          if (choice.value === 'pending') $('additional-details').open = true;
+        });
+        $('choices').append(label);
+      }
+      $('correction-fields').replaceChildren();
+      for (const field of item.fields) {
+        const label = textElement('label', field.label, 'field');
+        const input = document.createElement('textarea');
+        input.rows = item.fields.length > 1 ? 2 : 3;
+        input.maxLength = 10000; input.placeholder = field.placeholder || '';
+        input.value = answer.values[field.key] || ''; input.dataset.key = field.key;
+        input.addEventListener('input', () => { answer.values[field.key] = input.value; answer.updatedAt = new Date().toISOString(); $('answer-error').hidden = true; save(); });
+        label.append(input); $('correction-fields').append(label);
+      }
+      $('applicability').value = answer.applicability;
+      $('note').value = answer.note;
+      $('additional-details').open = Boolean(answer.note || answer.applicability || answer.decision === 'pending');
+      $('answer-error').hidden = true;
+      updateCorrectionVisibility();
+      $('issue-counter').textContent = '第 ' + (currentIndex + 1) + ' 项 / 共 ' + data.issues.length + ' 项';
+      $('previous').disabled = currentIndex === 0;
+      $('next').textContent = currentIndex === data.issues.length - 1 ? '检查结果' : '下一项';
+      $('mobile-nav').value = item.id;
+      save();
+      if (focus) { $('issue-title').focus({preventScroll:true}); $('review-view').scrollIntoView({behavior:'smooth',block:'start'}); }
+    }
+
+    function showImage(evidence, thumb) {
+      $('zoom-image').src = evidence.image;
+      $('zoom-image').alt = evidence.caption;
+      $('image-caption').textContent = evidence.caption + ' · 可横向或纵向滚动查看';
+      // A readable initial width; scroll keeps narrow phone screens usable.
+      const naturalWidth = (Number.isFinite(evidence.width) && evidence.width > 0) ? evidence.width : (thumb && thumb.naturalWidth) || 0;
+      if (naturalWidth > 0) {
+        $('zoom-image').style.width = Math.max(900, Math.min(naturalWidth, 1280)) + 'px';
+      } else {
+        $('zoom-image').style.removeProperty('width');
+      }
+      $('image-dialog').showModal();
+    }
+
+    function labelFor(item, answer) {
+      return item.choices.find(choice => choice.value === answer.decision)?.label || '未填写';
+    }
+
+    function answerText(item, answer) {
+      if (!answer.decision) return '';
+      const choice = item.choices.find(choice => choice.value === answer.decision);
+      const lines = ['处理意见：' + choice.label, choice.detail];
+      if (needsCorrection(item, answer)) {
+        for (const field of item.fields) {
+          if ((answer.values[field.key] || '').trim()) lines.push(field.label + '：' + answer.values[field.key].trim());
+        }
+      }
+      if (answer.applicability.trim()) lines.push('适用型号/配置：' + answer.applicability.trim());
+      if (answer.note.trim()) lines.push('补充说明：' + answer.note.trim());
+      if (reviewer.name) lines.push('填写人：' + reviewer.name);
+      if (reviewer.team) lines.push('部门/职务：' + reviewer.team);
+      return lines.join('\n');
+    }
+
+    function showSummary(focus=true) {
+      showingSummary = true;
+      $('review-view').hidden = true; $('reference').hidden = true; $('summary-view').hidden = false;
+      const count = data.issues.filter(isComplete).length;
+      $('summary-description').textContent = '已填写 ' + count + ' 项，共 ' + data.issues.length + ' 项。点击事项名称可返回修改，未填完也可先导出。';
+      $('reviewer-name').value = reviewer.name; $('reviewer-team').value = reviewer.team;
+      $('summary-rows').replaceChildren();
+      for (const [index, item] of data.issues.entries()) {
+        const answer = answers[item.id];
+        const row = document.createElement('tr');
+        const title = document.createElement('td');
+        const button = textElement('button', item.product + ' · ' + item.title); button.type = 'button';
+        button.addEventListener('click', () => showIssue(index, true));
+        title.append(button, textElement('span', item.id, 'summary-small'));
+        const decision = textElement('td', labelFor(item, answer));
+        const additions = [];
+        if (needsCorrection(item, answer)) {
+          for (const field of item.fields) if (answer.values[field.key]) additions.push(field.label + '：' + answer.values[field.key]);
+        }
+        if (answer.applicability) additions.push('适用型号：' + answer.applicability);
+        if (answer.note) additions.push('说明：' + answer.note);
+        if (additions.length) decision.append(textElement('span', additions.join('\n'), 'summary-small'));
+        const status = answerError(item, answer) ? '需补充参数' : answer.decision ? '已填写' : '未填写';
+        row.append(title, decision, textElement('td', status));
+        $('summary-rows').append(row);
+      }
+      updateProgress();
+      if (focus) { $('summary-title').focus({preventScroll:true}); $('summary-view').scrollIntoView({behavior:'smooth',block:'start'}); }
+    }
+
+    function validateForExport() {
+      const index = data.issues.findIndex(item => answerError(item, answers[item.id]));
+      if (index >= 0) {
+        showIssue(index, true);
+        $('answer-error').textContent = answerError(data.issues[index], answers[data.issues[index].id]);
+        $('answer-error').hidden = false;
+        $('corrections').scrollIntoView({behavior:'smooth',block:'center'});
+        return false;
+      }
+      if (!data.issues.some(isComplete)) { notify('请先填写至少一项，再导出反馈。'); return false; }
+      return true;
+    }
+
+    function exportPayload() {
+      return {
+        schema:feedbackSchema, projectId:data.projectId, reviewRevision:data.revision,
+        exportedAt:new Date().toISOString(), reviewer:{...reviewer},
+        answers:data.issues.map(item => {
+          const answer = answers[item.id];
+          return { id:item.id, answerId:item.answerId, decision:answer.decision,
+                   decisionLabel:labelFor(item, answer), values:needsCorrection(item, answer) ? {...answer.values} : {},
+                   applicability:answer.applicability, note:answer.note, updatedAt:answer.updatedAt,
+                   answerText:answerText(item, answer), question:item.ledgerQuestion,
+                   sourceName:item.sourceName, sourceLocation:item.sourceLocation };
+        })
+      };
+    }
+
+    function download(content, type, suffix) {
+      const blob = new Blob([content], {type});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href = url;
+      const stamp = new Date().toLocaleDateString('sv-SE').replaceAll('-', '') + '-' + new Date().toTimeString().slice(0, 5).replace(':', '');
+      const prefix = String(data.exportPrefix || data.projectId || 'customer-review').replace(/[\\/:*?"<>|]/g, '-').trim() || 'customer-review';
+      anchor.download = prefix + '-客户确认反馈-' + stamp + suffix;
+      document.body.append(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+
+    function exportFeedback(format='json') {
+      if (!validateForExport()) return;
+      const payload = exportPayload();
+      if (format === 'csv') {
+        const csv = data.csv || {};
+        const headers = csv.headers || ['编号','要确认的问题','原文件名','在初筛包里的位置','回答（保留 / 不用 / 文字）'];
+        const columns = csv.columns || ['answerId','question','sourceName','sourceLocation','answerText'];
+        const rows = [headers];
+        for (const answer of payload.answers) rows.push(columns.map(key => answer[key] ?? ''));
+        const escape = value => {
+          let text = String(value);
+          if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+          return '"' + text.replaceAll('"', '""') + '"';
+        };
+        download('\ufeff' + rows.map(row => row.map(escape).join(',')).join('\r\n'), 'text/csv;charset=utf-8', '.csv');
+      } else {
+        download(JSON.stringify(payload, null, 2), 'application/json;charset=utf-8', '.json');
+      }
+      const count = data.issues.filter(isComplete).length;
+      notify('已导出 ' + count + ' 项反馈，请将下载的文件发回给我们。' + (count < data.issues.length ? '其余 ' + (data.issues.length - count) + ' 项保留为未填写。' : ''));
+    }
+
+    function notify(message) {
+      clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
+      toastTimer = setTimeout(() => { $('toast').hidden = true; }, 8500);
+    }
+
+    async function importFeedback(file) {
+      if (!file) return;
+      try {
+        if (file.size > 3000000) throw new Error('文件较大，请选择本页导出的反馈文件。');
+        const imported = JSON.parse(await file.text());
+        if (imported.schema !== feedbackSchema || imported.projectId !== data.projectId || imported.reviewRevision !== data.revision || !Array.isArray(imported.answers)) throw new Error('这个文件与当前确认页的版本不匹配。');
+        const pending = [];
+        const seen = new Set();
+        for (const entry of imported.answers) {
+          if (!entry || typeof entry !== 'object' || !byId.has(entry.id) || seen.has(entry.id)) throw new Error('反馈文件包含无效或重复的事项。');
+          seen.add(entry.id);
+          const item = byId.get(entry.id);
+          if (entry.decision && !item.choices.some(choice => choice.value === entry.decision)) throw new Error('反馈文件含有无法识别的处理选项。');
+          pending.push([entry.id, cleanAnswer(item, entry)]);
+        }
+        for (const [id, answer] of pending) if (answer.decision || answer.note || answer.applicability || Object.keys(answer.values).length) answers[id] = answer;
+        if (typeof imported.reviewer?.name === 'string') reviewer.name = imported.reviewer.name.slice(0, 200);
+        if (typeof imported.reviewer?.team === 'string') reviewer.team = imported.reviewer.team.slice(0, 200);
+        save(); showSummary(); notify('已导入反馈，可继续填写或修改。');
+      } catch (error) { notify(error instanceof SyntaxError ? '无法读取该文件，请选择本页导出的反馈文件。' : error.message); }
+      $('import-file').value = '';
+    }
+
+    document.title = (data.title || '客户资料确认') + ' · ' + (data.company || data.projectId || '');
+    $('brandline').textContent = [data.company, data.projectId, data.createdAt].filter(Boolean).join(' · ');
+    document.querySelector('h1').textContent = data.title || '客户资料确认';
+    if (data.instructions) $('instructions').textContent = data.instructions;
+    restore(); buildNavigation(); showIssue(currentIndex);
+    if (!storageAvailable) $('save-state').textContent = '此浏览器无法暂存，请及时导出反馈';
+    $('mobile-nav').addEventListener('change', event => showIssue(data.issues.findIndex(item => item.id === event.target.value), true));
+    $('summary-button').addEventListener('click', () => showSummary());
+    $('export-top').addEventListener('click', () => exportFeedback());
+    $('export-bottom').addEventListener('click', () => exportFeedback());
+    $('export-csv').addEventListener('click', () => exportFeedback('csv'));
+    $('import-button').addEventListener('click', () => $('import-file').click());
+    $('import-file').addEventListener('change', event => importFeedback(event.target.files[0]));
+    $('previous').addEventListener('click', () => showIssue(currentIndex - 1, true));
+    $('next').addEventListener('click', () => {
+      const item = data.issues[currentIndex]; const error = answerError(item, answers[item.id]);
+      if (error) { $('answer-error').textContent = error; $('answer-error').hidden = false; return; }
+      if (currentIndex === data.issues.length - 1) showSummary(); else showIssue(currentIndex + 1, true);
+      save();
+    });
+    $('applicability').addEventListener('input', event => { const answer = answers[data.issues[currentIndex].id]; answer.applicability = event.target.value; answer.updatedAt = new Date().toISOString(); save(); });
+    $('note').addEventListener('input', event => { const answer = answers[data.issues[currentIndex].id]; answer.note = event.target.value; answer.updatedAt = new Date().toISOString(); save(); });
+    $('reviewer-name').addEventListener('input', event => { reviewer.name = event.target.value; save(); });
+    $('reviewer-team').addEventListener('input', event => { reviewer.team = event.target.value; save(); });
+    $('answer-form').addEventListener('submit', event => event.preventDefault());
+    $('image-close').addEventListener('click', () => $('image-dialog').close());
+    $('image-dialog').addEventListener('click', event => { if (event.target === $('image-dialog')) $('image-dialog').close(); });
+  </script>
+</body>
+</html>

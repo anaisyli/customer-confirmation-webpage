@@ -1,0 +1,4 @@
+interface:
+  display_name: "客户反馈网页生成"
+  short_description: "Offline customer review pages with evidence and feedback export"
+  default_prompt: "Use $customer-confirmation-webpage to build a customer review page from these approved questions and source files."
