@@ -8,9 +8,11 @@ import base64
 import hashlib
 import json
 import mimetypes
+import re
 import struct
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 DEFAULT_TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "review-template.html"
@@ -54,12 +56,35 @@ def load_data(path: Path) -> dict:
             item[field] = require_string(item.get(field), field, where)
         if item.get("sourcePath") is not None:
             item["sourcePath"] = require_string(item.get("sourcePath"), "sourcePath", where)
+            for raw_path in item["sourcePath"].split("；"):
+                source_path = raw_path.strip()
+                if (not source_path
+                        or re.match(r"^(?:[A-Za-z]:|[/\\]{1,2})", source_path)
+                        or any(part == ".." for part in re.split(r"[/\\]+", source_path))):
+                    raise ValueError(f"{where}.sourcePath must stay relative to the screening package")
+        if "cusId" in item:
+            item["cusId"] = require_string(item["cusId"], "cusId", where)
+        kind = item.get("kind", "fact")
+        if kind not in ("fact", "usage", "replacement"):
+            raise ValueError(f"{where}.kind must be fact, usage, or replacement")
+        item["kind"] = kind
         item.setdefault("ledgerQuestion", item["question"])
         item["ledgerQuestion"] = require_string(item.get("ledgerQuestion"), "ledgerQuestion", where)
         if item["id"] in issue_ids or item["answerId"] in answer_ids:
             raise ValueError(f"{where} has a duplicate id or answerId")
         issue_ids.add(item["id"])
         answer_ids.add(item["answerId"])
+        linked_answers = item.get("linkedAnswers", [])
+        if not isinstance(linked_answers, list):
+            raise ValueError(f"{where}.linkedAnswers must be an array")
+        for linked in linked_answers:
+            if not isinstance(linked, dict):
+                raise ValueError(f"{where}.linkedAnswers entries must be objects")
+            for field in ("answerId", "ledgerQuestion", "sourceName", "sourceLocation"):
+                linked[field] = require_string(linked.get(field), field, where)
+            if linked["answerId"] in answer_ids:
+                raise ValueError(f"{where} has a duplicate linked answerId")
+            answer_ids.add(linked["answerId"])
         values = item.get("originalValues")
         if not isinstance(values, list) or any(not isinstance(row, list) or len(row) != 2 for row in values):
             raise ValueError(f"{where}.originalValues must be an array of [label, value] pairs")
@@ -96,17 +121,58 @@ def load_data(path: Path) -> dict:
             if value in choice_values:
                 raise ValueError(f"{where} has duplicate choice value {value}")
             choice_values.add(value)
+            if "csvAnswer" in choice and choice["csvAnswer"] not in ("保留", "不用", ""):
+                raise ValueError(f"{where}.choices csvAnswer must be 保留, 不用, or empty")
             if (value == "revise" or choice.get("requiresCorrection")) and not fields:
                 raise ValueError(f"{where} choice {value} requires correction but no fields were defined")
+            if "correctionField" in choice:
+                key = require_string(choice["correctionField"], "choice.correctionField", where)
+                if key not in field_keys:
+                    raise ValueError(f"{where} choice {value} uses unknown correction field {key}")
+                choice["correctionField"] = key
+        dedicated_fields = {choice["correctionField"] for choice in choices if "correctionField" in choice}
+        if dedicated_fields and field_keys <= dedicated_fields and any(
+                "correctionField" not in choice and (choice["value"] == "revise" or choice.get("requiresCorrection"))
+                for choice in choices):
+            raise ValueError(f"{where} requires a correction field available to general choices")
         evidence = item.get("evidence")
         if not isinstance(evidence, list) or not evidence:
-            raise ValueError(f"{where}.evidence must contain at least one source screenshot")
-        for evidence_index, shot in enumerate(evidence, start=1):
-            shot_where = f"{where}.evidence[{evidence_index - 1}]"
+            raise ValueError(f"{where}.evidence must contain at least one identified source")
+        for evidence_index, shot in enumerate(evidence):
+            shot_where = f"{where}.evidence[{evidence_index}]"
             if not isinstance(shot, dict):
                 raise ValueError(f"{shot_where} must be an object")
             require_string(shot.get("caption"), "caption", shot_where)
-            require_string(shot.get("imagePath"), "imagePath", shot_where)
+            if "highlighted" in shot and not isinstance(shot["highlighted"], bool):
+                raise ValueError(f"{shot_where}.highlighted must be a boolean")
+            source_url = shot.get("sourceUrl")
+            if source_url is not None:
+                source_url = require_string(source_url, "sourceUrl", shot_where)
+                parsed = urlsplit(source_url)
+                if parsed.scheme not in {"https", "http"} or not parsed.hostname or parsed.username or parsed.password:
+                    raise ValueError(f"{shot_where}: sourceUrl must be a public HTTP(S) URL")
+                shot["sourceUrl"] = source_url
+                for name in ("sourceName", "location", "capturedAt"):
+                    shot[name] = require_string(shot.get(name), name, shot_where)
+            if "excerpt" in shot:
+                if source_url is None:
+                    for name in ("sourceName", "location"):
+                        shot[name] = require_string(shot.get(name), name, shot_where)
+                excerpt = require_string(shot["excerpt"], "excerpt", shot_where)
+                shot["excerpt"] = excerpt
+                highlights = shot.get("highlights", [])
+                if not isinstance(highlights, list) or any(
+                    not isinstance(fragment, str) or not fragment.strip() or fragment not in excerpt
+                    for fragment in highlights
+                ):
+                    raise ValueError(f"{shot_where}: highlights must be verbatim fragments of the excerpt")
+            if "imagePath" in shot:
+                require_string(shot.get("imagePath"), "imagePath", shot_where)
+            elif "excerpt" not in shot:
+                if kind != "usage":
+                    raise ValueError(f"{shot_where}: evidence needs an image or excerpt")
+                for name in ("sourceName", "location"):
+                    shot[name] = require_string(shot.get(name), name, shot_where)
     data.setdefault("createdAt", "")
     data.setdefault("title", "客户资料确认")
     data.setdefault("exportPrefix", data["projectId"])
@@ -180,6 +246,14 @@ def embed_images(data: dict, data_path: Path) -> list[dict]:
     report: list[dict] = []
     for item in data["issues"]:
         for shot in item["evidence"]:
+            if "imagePath" not in shot:
+                report.append({
+                    "issueId": item["id"], "caption": shot["caption"],
+                    **{key: shot[key] for key in ("sourceName", "sourceUrl", "location", "capturedAt") if key in shot},
+                    **({"sha256": hashlib.sha256(shot["excerpt"].encode("utf-8")).hexdigest()}
+                       if "excerpt" in shot else {"identificationOnly": True}),
+                })
+                continue
             path = Path(shot["imagePath"])
             if not path.is_absolute():
                 path = base_dir / path
@@ -197,6 +271,7 @@ def embed_images(data: dict, data_path: Path) -> list[dict]:
             report.append({
                 "issueId": item["id"], "caption": shot["caption"],
                 "imageName": path.name, "bytes": len(raw),
+                **{key: shot[key] for key in ("sourceUrl", "location", "capturedAt") if key in shot},
                 "sha256": hashlib.sha256(raw).hexdigest(),
             })
     return report
@@ -223,7 +298,12 @@ def sanitize_public_data(data: dict) -> dict:
     for item in data["issues"]:
         entry: dict = {
             "id": item["id"],
+            "kind": item["kind"],
             "answerId": item["answerId"],
+            **({"linkedAnswers": [{key: linked[key] for key in
+                                 ("answerId", "ledgerQuestion", "sourceName", "sourceLocation")}
+                                 for linked in item["linkedAnswers"]]} if item.get("linkedAnswers") else {}),
+            **({"cusId": item["cusId"]} if "cusId" in item else {}),
             "product": item["product"],
             "title": item["title"],
             "question": item["question"],
@@ -241,13 +321,16 @@ def sanitize_public_data(data: dict) -> dict:
                     "label": c["label"],
                     "detail": c["detail"],
                     **({"requiresCorrection": True} if c.get("requiresCorrection") else {}),
+                    **({"correctionField": c["correctionField"]} if "correctionField" in c else {}),
+                    **({"csvAnswer": c["csvAnswer"]} if "csvAnswer" in c else {}),
                 }
                 for c in item["choices"]
             ],
             "evidence": [
                 {
                     "caption": s["caption"],
-                    "image": s["image"],
+                    **{key: s[key] for key in ("image", "sourceUrl", "location", "capturedAt", "excerpt", "highlights", "highlighted")
+                       if key in s},
                     "sourceName": s.get("sourceName", item["sourceName"]),
                     **({"width": s["width"], "height": s["height"]} if "width" in s and "height" in s else {}),
                 }

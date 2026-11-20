@@ -22,23 +22,30 @@ Each `issues[]` entry contains:
 | Field | Required | Meaning |
 |---|---|---|
 | `id` | yes | Stable internal item ID, e.g. `P-010-CUS-021` |
+| `cusId` | optional | Parent CUS ID shared by multiple cards. Use a distinct card `id` for each independently answered row. |
 | `answerId` | yes | Exact answer-row ID expected by the active CUS/KB build, e.g. `P-010-CUS-021.1`; never guess or renumber |
+| `linkedAnswers` | optional | Identical decisions only. Array of additional source rows with exact `answerId`, `ledgerQuestion`, `sourceName`, `sourceLocation`. Display all covered sources on the card. A shared reply expands to all rows in CSV. The `exception` choice keeps the details in JSON and exports blank CSV answers for this card. |
+| `kind` | optional | `fact` (default), `usage` for file/image/page permissions, or `replacement` for missing or updated materials |
 | `product` | yes | Product/model/configuration name shown in the navigation |
 | `title` | yes | Short question heading |
 | `question` | yes | Plain-language explanation of what the customer is deciding |
 | `ledgerQuestion` | recommended | Exact customer question to write back to the CUS sheet; defaults should be set to `question` by the author |
-| `originalValues` | yes | Array of `[label, value]` pairs preserving the competing/source values |
-| `sourceName` | yes | Original filename shown on the page and exported to CSV |
-| `sourceLocation` | yes | Relative path in the screening package and/or page/slide, table/row, or section location; shown on the page and exported to CSV (never use local disk or vault absolute paths) |
-| `sourcePath` | optional | Relative path inside the screening package when kept separate from `sourceLocation`; shown on the page alongside `sourceName` and `sourceLocation` |
+| `originalValues` | yes | Array of `[label, value]` pairs preserving source values or identifying the material and reviewed scope. Use an empty array when the evidence identifies everything. |
+| `sourceName` | yes | Original filename or webpage title. For web evidence the card displays the per-source titles instead. Exported to CSV |
+| `sourceLocation` | yes | Location context for the CSV, such as a document page, webpage URL or section. Keep CSV column names compatible with the active build. Never use local disk or vault paths |
+| `sourcePath` | required for package files | Exact path relative to the screening-package root, with filename. The page labels it `初筛包位置`. For multiple source files, separate each package-relative path with `；`. Never put an absolute, drive-rooted, UNC or vault path here. Omit it for website-only sources. |
 | `fields` | yes | Array of correction fields `{key, label, placeholder?}`; may be empty if no correction is needed |
-| `choices` | yes | Array `{value, label, detail, requiresCorrection?}` tailored to this issue |
-| `evidence` | yes | One or more screenshots `{caption, imagePath}`; screenshots must already be cropped and highlighted |
+| `choices` | yes | Array `{value, label, detail, requiresCorrection?}` tailored to this issue. Optional `csvAnswer` overrides the answer cell only for that choice and accepts `保留`, `不用` or an empty string. JSON retains the full reply. |
+| `evidence` | yes | For a file, use `{caption, imagePath}` or `{caption, sourceName, location, excerpt}` with a verbatim extract. For a webpage, add `sourceUrl`, `sourceName`, `location`, `capturedAt` and a screenshot or extract. A usage card may use `{caption, sourceName, location}` when verified identification is sufficient. Set `highlighted: false` on an unmarked image and use `highlights` for literal fragments of an excerpt. |
 | `priorReviewRequired` | optional | Internal note only; stripped by `build_review_page.py` and never embedded in the customer HTML |
 
 If a choice needs the customer to provide at least one correction field before the answer counts as complete, set `requiresCorrection: true`. The generic `revise` choice also requires a correction value. Do not set it for a choice such as “choose the Chinese version” when the chosen value is already explicit.
 
+Set `correctionField` to an existing field key when a choice must show and require that field only. For example, a group exception can require a field for the affected file, page and decision. Fields dedicated to a choice are omitted from the general correction form.
+
 `imagePath` can be absolute or relative to `questions.json`. Use PNG, JPEG, WebP, or GIF. Make one screenshot per relevant table area rather than a whole-document screenshot. Captions should identify the source and its page/section, for example `英文规格书 · PDF 第 6 页 · P1.56 列`.
+
+For website evidence, add one item per page or relevant section. Use the date of the verified capture and include enough original text to place the value in context. A quotation is displayed as text and an original URL is opened only when clicked. The review HTML still opens offline.
 
 ## Minimal example
 
@@ -97,7 +104,7 @@ Default CSV headers and answer mapping:
 }
 ```
 
-For compatibility with `compile-enterprise-knowledge/scripts/apply_answers.py`, keep the default headers and use the exact current CUS `answerId`s. The reader primarily matches `编号` and reads `回答（保留 / 不用 / 文字）`; the other columns preserve context for people.
+For compatibility with `compile-enterprise-knowledge/scripts/apply_answers.py`, copy the active CSV headers and answer IDs, including labels such as `问题001`. The current location header may be `在文件里的位置`. For a binary row use an empty `csvAnswer` for partial approval or deferral and collect its details in JSON. For a text row omit the override so the exported answer carries the approved scope and the customer's notes.
 
 ## Customer feedback data
 

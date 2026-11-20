@@ -42,6 +42,7 @@
     .navitem[aria-current="step"] { background:var(--soft); color:var(--green); font-weight:600; }
     .navitem .num { font-variant-numeric:tabular-nums; color:var(--muted); }
     .navitem .mark { font-size:13px; color:var(--green); text-align:center; }
+    .navitem .nav-source { display:block; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
     .mobile-nav { display:none; }
     main { min-width:0; }
     .review { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
@@ -60,6 +61,15 @@
     .source-meta-row { display:grid; grid-template-columns:112px minmax(0,1fr); gap:8px; align-items:baseline; }
     .source-meta dt { color:var(--muted); font-weight:500; }
     .source-meta dd { margin:0; color:var(--ink); overflow-wrap:anywhere; word-break:break-word; }
+    .web-evidence { margin:0 0 14px; padding:12px; background:#fff; border:1px solid var(--line); border-radius:8px; min-width:0; }
+    .web-evidence a { color:#176760; overflow-wrap:anywhere; }
+    .web-evidence .source-url { display:block; font-size:12px; margin-top:4px; }
+    .evidence-pair { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr)); gap:12px; align-items:start; }
+    .evidence-pair .web-evidence { margin-bottom:0; }
+    .web-evidence .source-meta { margin:0 0 10px; padding:0; border:0; }
+    .web-excerpt { white-space:pre-wrap; overflow-wrap:anywhere; margin:8px 0 0; line-height:1.55; font-size:14px; }
+    .web-excerpt mark { background:#fff0a8; color:inherit; padding:1px 0; }
+    .evidence-caption { margin:0 0 7px; color:var(--muted); font-size:12px; font-weight:600; }
     .source-meta .source-path { font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace; font-size:12.5px; }
     .figure-hint { margin:0 0 12px; color:var(--muted); font-size:12px; }
     figure { margin:0 0 16px; }
@@ -87,6 +97,8 @@
     .detail-note { border-top:1px solid var(--line); margin-top:17px; padding-top:15px; }
     .detail-note summary { color:var(--green); cursor:pointer; font-size:13px; }
     .detail-note .field { margin-top:12px; }
+    .file-preview summary { color:var(--green); cursor:pointer; font-size:14px; font-weight:600; }
+    .file-preview[open] summary { margin-bottom:10px; }
     .error { color:var(--danger); font-size:13px; margin:12px 0 0; padding:10px; background:#fff1ed; border-radius:6px; }
     .issue-footer { padding:15px 25px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:15px; }
     .issue-counter { color:var(--muted); font-size:13px; }
@@ -149,21 +161,24 @@
         </div>
         <div class="issue-body">
           <section class="evidence" aria-label="原件内容">
-            <p class="section-label">原件中的写法</p>
-            <table class="values" aria-label="待确认的原件参数"><tbody id="original-values"></tbody></table>
-            <dl class="source-meta" id="source-meta" aria-label="来源文件信息"></dl>
-            <p class="figure-hint">重点已用黄色标出，点击图片可放大查看。</p>
-            <div id="evidence-images"></div>
+            <p class="section-label" id="evidence-title">原件中的写法</p>
+            <table class="values" id="values-table" aria-labelledby="evidence-title"><tbody id="original-values"></tbody></table>
+            <dl class="source-meta" id="source-meta" aria-label="来源信息"></dl>
+            <div id="evidence-content">
+              <p class="figure-hint" id="evidence-hint">重点已用黄色标出。</p>
+              <div id="evidence-images"></div>
+            </div>
+            <details class="file-preview" id="file-preview" hidden><summary>查看原件片段</summary></details>
           </section>
           <form id="answer-form" class="answers" novalidate>
             <fieldset><legend class="section-label">请选择处理方式</legend><div id="choices" class="choices"></div></fieldset>
             <div class="corrections" id="corrections" hidden>
               <p class="section-label">请填写确认后的内容</p><div id="correction-fields"></div>
-              <p class="figure-hint">如有新版规格书，也可在此说明，并将新版文件与反馈一起发回。</p>
+              <p class="figure-hint">可注明新版网页或资料的位置，并将相关文件与反馈一起发回。</p>
             </div>
             <details class="detail-note" id="additional-details">
-              <summary>补充适用型号或说明（选填）</summary>
-              <label class="field">适用型号 / 配置<input id="applicability" type="text" maxlength="2000" placeholder="这项结论适用于哪些型号或配置"></label>
+              <summary>补充适用范围或说明（选填）</summary>
+              <label class="field">适用范围<input id="applicability" type="text" maxlength="2000" placeholder="可填写主体、产品型号或适用工况"></label>
               <label class="field">补充说明<textarea id="note" rows="3" maxlength="10000" placeholder="如需内部确认，可填写负责人或预计回复时间"></textarea></label>
             </details>
             <p class="error" id="answer-error" role="alert" hidden></p>
@@ -184,18 +199,18 @@
         </div>
         <table class="summary-table"><thead><tr><th>确认事项</th><th>您的意见</th><th>填写情况</th></tr></thead><tbody id="summary-rows"></tbody></table>
         <div class="download-actions">
-          <button class="btn primary" type="button" id="export-bottom">导出反馈文件</button>
-          <button class="btn" type="button" id="export-csv">导出表格</button>
+          <button class="btn primary" type="button" id="export-bottom">导出 JSON 反馈</button>
+          <button class="btn" type="button" id="export-csv">导出 CSV 表格</button>
           <button class="btn quiet" type="button" id="import-button">导入已填反馈</button>
         </div>
-        <p class="return-help">导出后，把下载的反馈文件发回给我们。有新版规格书时请一并发送。未填完也可先导出。</p>
+        <p class="return-help">导出后，把下载的 JSON 反馈发回给我们。如需表格，可一并导出 CSV。未填完也可先导出。</p>
       </section>
     </main>
   </div>
   <input id="import-file" type="file" accept="application/json,.json" hidden>
   <dialog id="image-dialog" aria-label="放大原件截图"><div class="modal-bar"><p id="image-caption"></p><button type="button" class="btn" id="image-close">关闭</button></div><div class="zoom-area"><img id="zoom-image" alt=""></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <noscript><p class="no-script">请在 Chrome、Edge 或其他支持 JavaScript 的浏览器中打开此文件，以查看截图并填写反馈。</p></noscript>
+  <noscript><p class="no-script">请在 Chrome、Edge 或其他支持 JavaScript 的浏览器中打开此文件，以查看证据并填写反馈。</p></noscript>
   <script id="review-data" type="application/json">__REVIEW_DATA__</script>
   <script>
     'use strict';
@@ -260,13 +275,22 @@
     }
 
     function needsCorrection(item, answer) {
-      return answer.decision === 'revise' || item.choices.some(choice => choice.value === answer.decision && choice.requiresCorrection === true);
+      return answer.decision === 'revise' || item.choices.some(choice =>
+        choice.value === answer.decision && (choice.requiresCorrection === true || choice.correctionField));
+    }
+
+    function activeFields(item, answer) {
+      if (!needsCorrection(item, answer)) return [];
+      const dedicated = item.choices.find(choice => choice.value === answer.decision)?.correctionField;
+      if (dedicated) return item.fields.filter(field => field.key === dedicated);
+      return item.fields.filter(field => !item.choices.some(choice => choice.correctionField === field.key));
     }
 
     function answerError(item, answer) {
       if (!answer.decision) return '';
-      if (needsCorrection(item, answer) && !item.fields.some(field => (answer.values[field.key] || '').trim())) {
-        return '请至少填写一项正确参数，或说明将另附哪份新版规格书。';
+      const fields = activeFields(item, answer);
+      if (needsCorrection(item, answer) && !fields.some(field => (answer.values[field.key] || '').trim())) {
+        return fields.length === 1 ? '请填写「' + fields[0].label + '」。' : '请填写更正内容，或注明可提供的资料。';
       }
       return '';
     }
@@ -290,7 +314,7 @@
       }
       for (const option of $('mobile-nav').options) {
         const item = byId.get(option.value);
-        option.textContent = (isComplete(item) ? '✓ ' : '') + (data.issues.indexOf(item) + 1) + '. ' + item.product;
+        option.textContent = (isComplete(item) ? '✓ ' : '') + (data.issues.indexOf(item) + 1) + '. ' + item.title + ' · ' + item.product;
       }
     }
 
@@ -301,7 +325,9 @@
         button.className = 'navitem';
         button.dataset.id = item.id;
         button.append(textElement('span', String(index + 1).padStart(2, '0'), 'num'));
-        button.append(textElement('span', item.product));
+        const label = textElement('span', item.title);
+        label.append(textElement('small', item.product, 'nav-source'));
+        button.append(label);
         button.append(textElement('span', '', 'mark'));
         button.addEventListener('click', () => showIssue(index, true));
         $('navlist').append(button);
@@ -313,7 +339,11 @@
 
     function updateCorrectionVisibility() {
       const item = data.issues[currentIndex];
-      $('corrections').hidden = !needsCorrection(item, answers[item.id]);
+      const fields = activeFields(item, answers[item.id]);
+      $('corrections').hidden = fields.length === 0;
+      for (const label of $('correction-fields').children) {
+        label.hidden = !fields.some(field => field.key === label.querySelector('textarea').dataset.key);
+      }
     }
 
     function showIssue(index, focus=false) {
@@ -327,7 +357,9 @@
       $('product').textContent = item.product;
       $('issue-title').textContent = item.title;
       $('question').textContent = item.question;
-      $('reference').textContent = '事项编号 ' + item.id + ' · ' + item.evidence.map(e => e.caption).join(' / ');
+      $('reference').textContent = '事项编号 ' + (item.cusId || item.id);
+      $('evidence-title').textContent = {usage:'待确认的资料', replacement:'需要补充的原件位置'}[item.kind] || '原件中的写法';
+      $('values-table').hidden = !item.originalValues.length;
       $('original-values').replaceChildren();
       for (const [label, value] of item.originalValues) {
         const row = document.createElement('tr');
@@ -337,13 +369,15 @@
         $('original-values').append(row);
       }
       $('source-meta').replaceChildren();
+      const isWebsite = item.evidence.some(evidence => evidence.sourceUrl);
+      const wholeFile = item.kind === 'usage' && item.sourceLocation === '整份文件'
+        && !isWebsite && !item.linkedAnswers?.length;
+      $('source-meta').hidden = isWebsite && !item.sourcePath;
       const sourceEntries = [['原文件名', item.sourceName, false]];
       if (item.sourcePath) {
         sourceEntries.push(['初筛包位置', item.sourcePath, true]);
-        sourceEntries.push(['具体位置', item.sourceLocation, false]);
-      } else {
-        sourceEntries.push(['初筛包位置', item.sourceLocation, true]);
       }
+      if (!wholeFile) sourceEntries.push(['具体位置', item.sourceLocation, false]);
       for (const [label, value, isPath] of sourceEntries) {
         if (!value) continue;
         const row = document.createElement('div');
@@ -352,19 +386,82 @@
         $('source-meta').append(row);
       }
       $('evidence-images').replaceChildren();
+      $('evidence-images').classList.toggle('evidence-pair',
+        item.evidence.length === 2 && item.evidence.every(evidence => evidence.sourceUrl));
+      const hasImages = item.evidence.some(evidence => evidence.image);
+      const hasExcerpts = item.evidence.some(evidence => evidence.excerpt);
+      const hasPreviewContent = hasImages || hasExcerpts;
+      const hasHighlights = item.evidence.some(evidence =>
+        (evidence.image && evidence.highlighted !== false) || evidence.highlights?.length);
+      const filePreview = $('file-preview');
+      filePreview.hidden = !(wholeFile && hasPreviewContent);
+      filePreview.open = false;
+      filePreview.querySelector('summary').textContent = hasImages && item.evidence.every(evidence => evidence.image && !evidence.excerpt)
+        ? '查看原件配图' : '查看原件片段';
+      if (wholeFile && hasPreviewContent) filePreview.append($('evidence-content'));
+      else filePreview.before($('evidence-content'));
+      $('evidence-content').hidden = wholeFile && !hasPreviewContent;
+      $('evidence-hint').textContent = [
+        hasHighlights ? '重点已用黄色标出。' : '',
+        hasImages ? '点击图片可放大查看。' : ''
+      ].join('');
+      $('evidence-hint').hidden = !hasImages && !hasHighlights;
       for (const evidence of item.evidence) {
+        let container = $('evidence-images');
+        if (evidence.sourceUrl || evidence.excerpt || (!evidence.image && evidence.location)) {
+          container = document.createElement('article');
+          container.className = 'web-evidence';
+          $('evidence-images').append(container);
+          if (wholeFile) {
+            container.append(textElement('p', evidence.location, 'evidence-caption'));
+          } else {
+            const source = document.createElement('dl');
+            source.className = 'source-meta';
+            if (evidence.caption) container.append(textElement('p', evidence.caption, 'evidence-caption'));
+            const name = textElement('dd', evidence.sourceName);
+            if (evidence.sourceUrl) {
+              const link = textElement('a', evidence.sourceUrl, 'source-url');
+              link.href = evidence.sourceUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
+              name.append(link);
+            }
+            const urlRow = document.createElement('div');
+            urlRow.append(textElement('dt', evidence.sourceUrl ? '官网原页' : '原文件名'), name);
+            const locationRow = document.createElement('div');
+            const position = [evidence.location, evidence.capturedAt].filter(Boolean).join(' · ');
+            locationRow.append(textElement('dt', evidence.capturedAt ? '位置与取证日期' : '具体位置'), textElement('dd', position));
+            source.append(urlRow, locationRow);
+            container.append(source);
+          }
+        }
+        if (evidence.excerpt) {
+          const excerpt = document.createElement('blockquote');
+          excerpt.className = 'web-excerpt';
+          const highlights = [...(evidence.highlights || [])].sort((a, b) => b.length - a.length);
+          const escape = term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          if (highlights.length) {
+            const parts = evidence.excerpt.split(new RegExp('(' + highlights.map(escape).join('|') + ')', 'g'));
+            for (let index = 0; index < parts.length; index++) {
+              excerpt.append(index % 2 ? textElement('mark', parts[index]) : document.createTextNode(parts[index]));
+            }
+          } else {
+            excerpt.textContent = evidence.excerpt;
+          }
+          container.append(excerpt);
+        }
+        if (!evidence.image) continue;
         const figure = document.createElement('figure');
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'image-button';
         button.setAttribute('aria-label', '放大查看 ' + evidence.caption);
         const image = document.createElement('img');
-        image.src = evidence.image; image.alt = evidence.caption + '，黄色区域为待确认内容';
+        image.src = evidence.image;
+        image.alt = evidence.caption + (evidence.highlighted === false ? '' : '，黄色区域为待确认内容');
         if (Number.isFinite(evidence.width) && evidence.width > 0) image.width = evidence.width;
         if (Number.isFinite(evidence.height) && evidence.height > 0) image.height = evidence.height;
         button.append(image);
         button.addEventListener('click', () => showImage(evidence, image));
         figure.append(button, textElement('figcaption', evidence.caption));
-        $('evidence-images').append(figure);
+        container.append(figure);
       }
       $('choices').replaceChildren();
       for (const choice of item.choices) {
@@ -426,10 +523,8 @@
       if (!answer.decision) return '';
       const choice = item.choices.find(choice => choice.value === answer.decision);
       const lines = ['处理意见：' + choice.label, choice.detail];
-      if (needsCorrection(item, answer)) {
-        for (const field of item.fields) {
-          if ((answer.values[field.key] || '').trim()) lines.push(field.label + '：' + answer.values[field.key].trim());
-        }
+      for (const field of activeFields(item, answer)) {
+        if ((answer.values[field.key] || '').trim()) lines.push(field.label + '：' + answer.values[field.key].trim());
       }
       if (answer.applicability.trim()) lines.push('适用型号/配置：' + answer.applicability.trim());
       if (answer.note.trim()) lines.push('补充说明：' + answer.note.trim());
@@ -454,8 +549,8 @@
         title.append(button, textElement('span', item.id, 'summary-small'));
         const decision = textElement('td', labelFor(item, answer));
         const additions = [];
-        if (needsCorrection(item, answer)) {
-          for (const field of item.fields) if (answer.values[field.key]) additions.push(field.label + '：' + answer.values[field.key]);
+        for (const field of activeFields(item, answer)) {
+          if (answer.values[field.key]) additions.push(field.label + '：' + answer.values[field.key]);
         }
         if (answer.applicability) additions.push('适用型号：' + answer.applicability);
         if (answer.note) additions.push('说明：' + answer.note);
@@ -487,11 +582,13 @@
         exportedAt:new Date().toISOString(), reviewer:{...reviewer},
         answers:data.issues.map(item => {
           const answer = answers[item.id];
-          return { id:item.id, answerId:item.answerId, decision:answer.decision,
-                   decisionLabel:labelFor(item, answer), values:needsCorrection(item, answer) ? {...answer.values} : {},
+          return { id:item.id, answerId:item.answerId, cusId:item.cusId || item.id, decision:answer.decision,
+                   decisionLabel:labelFor(item, answer),
+                   values:Object.fromEntries(activeFields(item, answer).map(field => [field.key, answer.values[field.key] || ''])),
                    applicability:answer.applicability, note:answer.note, updatedAt:answer.updatedAt,
                    answerText:answerText(item, answer), question:item.ledgerQuestion,
-                   sourceName:item.sourceName, sourceLocation:item.sourceLocation };
+                   sourceName:item.sourceName, sourceLocation:item.sourceLocation,
+                   ...(item.linkedAnswers ? {linkedAnswers:item.linkedAnswers} : {}) };
         })
       };
     }
@@ -515,7 +612,18 @@
         const headers = csv.headers || ['编号','要确认的问题','原文件名','在初筛包里的位置','回答（保留 / 不用 / 文字）'];
         const columns = csv.columns || ['answerId','question','sourceName','sourceLocation','answerText'];
         const rows = [headers];
-        for (const answer of payload.answers) rows.push(columns.map(key => answer[key] ?? ''));
+        for (const answer of payload.answers) {
+          const item = byId.get(answer.id);
+          const choice = item.choices.find(option => option.value === answer.decision);
+          const csvAnswer = choice?.csvAnswer ?? answer.answerText;
+          const shared = item.linkedAnswers || [];
+          const perRowAnswer = shared.length && answer.decision === 'exception' ? '' : csvAnswer;
+          rows.push(columns.map(key => key === 'answerText' ? perRowAnswer : (answer[key] ?? '')));
+          for (const linked of shared) {
+            const row = {...answer, ...linked, question:linked.ledgerQuestion};
+            rows.push(columns.map(key => key === 'answerText' ? perRowAnswer : (row[key] ?? '')));
+          }
+        }
         const escape = value => {
           let text = String(value);
           if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
