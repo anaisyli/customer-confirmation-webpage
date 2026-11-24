@@ -160,6 +160,8 @@
     .audit-row-head { display:flex; justify-content:space-between; gap:10px; align-items:baseline; flex-wrap:wrap; margin-bottom:4px; }
     .audit-row p { margin:3px 0 0; color:var(--muted); font-size:12.5px; }
     .audit-members { margin:6px 0 0; padding-left:18px; font-size:12px; color:var(--text); }
+    .audit-members li + li { margin-top:6px; }
+    .audit-members .member-detail { white-space:pre-wrap; }
     .summary-view { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
     .reviewer-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:620px; margin:16px 0 10px; }
     .summary-table { width:100%; border-collapse:collapse; margin:14px 0 18px; font-size:13.5px; }
@@ -852,7 +854,10 @@
             det.append(textEl('summary', '查看明细（' + rec.members.length + ' 项）', 'member-detail'));
             const ul = document.createElement('ul'); ul.className = 'audit-members';
             for (const m of rec.members) {
-              ul.append(textEl('li', m.detail ? m.label + ' — ' + m.detail : m.label));
+              const entry = document.createElement('li');
+              entry.append(textEl('strong', m.label, 'member-title'));
+              if (m.detail) entry.append(textEl('span', m.detail, 'member-detail'));
+              ul.append(entry);
             }
             det.append(ul);
             card.append(det);
