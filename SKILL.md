@@ -15,7 +15,7 @@ Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file
 ## Mode isolation (hard boundary)
 
 - Never mix customer and internal payloads: `build_review_page.py` refuses internal data (`mode: "internal"` / `internal-review-input.v1`) in `customer` mode and refuses customer data in `internal` mode.
-- Never write an internal review page into `交付客户/` (or `customer-delivery` / `to-customer`): `build_review_page.py --mode internal` rejects those output paths. Put internal pages in `内部决策/<项目名>-内部待办决策页.html` or the KB run directory (`04_知识库构建/governance-review.html`).
+- Never write an internal review page into `交付客户/` (or `customer-delivery` / `to-customer`): `build_review_page.py --mode internal` rejects those output paths. Always put internal pages in `客户确认网页/<项目编号>-<项目名>/内部决策/<项目名>-内部待办决策页.html` alongside the same project's customer review folder.
 - Keep internal review inputs, internal HTML pages, and `governance-decisions.json` strictly internal; only a verified `--mode customer` HTML in `交付客户/` may be sent to a customer.
 
 ## Work boundaries
@@ -40,7 +40,7 @@ Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file
 
 ## Build and verify
 
-Use `客户确认网页/<项目编号>-<项目名>/` relative to the current machine's `SEO-Runs` workspace root. Resolve the root from the workspace or the supplied root path, and reuse the same project folder for later revisions. Put customer HTML in `交付客户/`, internal governance HTML in `内部决策/` (or the KB run directory `04_知识库构建/governance-review.html`), input JSON and evidence in `work/`, and build reports and archived revisions in `内部交接/`.
+Use `客户确认网页/<项目编号>-<项目名>/` relative to the current machine's `SEO-Runs` workspace root for both customer and internal review pages. Resolve the root from the workspace or the supplied root path, and reuse the same project folder for later revisions. Put customer HTML in `交付客户/`, internal governance HTML in `内部决策/`, input JSON and evidence in `work/`, and build reports and archived revisions in `内部交接/`.
 
 ### Customer mode (`--mode customer`, default)
 
