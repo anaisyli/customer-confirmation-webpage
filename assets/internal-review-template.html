@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>内部待办决策页</title>
+  <style>
+    :root {
+      --ink:#1b2630; --text:#2b3a47; --muted:#5f7080; --line:#d8e0e7; --paper:#f3f5f8;
+      --accent:#9a3412; --accent-dark:#7c2d12; --accent-soft:#fff4ed; --accent-border:#fdba74;
+      --blue:#1d4ed8; --blue-soft:#eff6ff; --amber:#92400e; --amber-soft:#fef3c7;
+      --green:#0f766e; --green-soft:#ecfdf5; --danger:#b91c1c; --danger-soft:#fef2f2;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--text); font-family:Inter,"Microsoft YaHei","PingFang SC",sans-serif; font-size:15px; line-height:1.6; }
+    button,input,textarea,select { font:inherit; }
+    button { cursor:pointer; touch-action:manipulation; }
+    button:disabled { cursor:default; opacity:.42; }
+    button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid #f97316; outline-offset:2px; }
+    [hidden] { display:none !important; }
+    .internal-banner { background:var(--accent); color:#fff; font-size:13px; font-weight:650; letter-spacing:.02em; }
+    .internal-banner-inner { max-width:1520px; margin:auto; padding:8px 28px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+    .internal-banner .tag { display:inline-flex; align-items:center; gap:6px; }
+    .internal-banner .meta { font-weight:500; opacity:.92; font-size:12px; }
+    .top { background:#fff; border-bottom:1px solid var(--line); }
+    .top-inner { max-width:1520px; margin:auto; padding:18px 28px 16px; display:flex; justify-content:space-between; gap:20px; align-items:center; flex-wrap:wrap; }
+    .brandline { margin:0 0 2px; color:var(--muted); font-size:13px; }
+    h1 { font-size:23px; line-height:1.35; margin:0; color:var(--ink); font-weight:700; }
+    .top-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn { padding:9px 15px; border:1px solid #c0cbd5; border-radius:8px; background:#fff; color:var(--ink); font-weight:600; min-height:40px; font-size:14px; }
+    .btn:hover { background:#f5f7fa; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn.primary:hover { background:var(--accent-dark); }
+    .btn.subtle { background:var(--accent-soft); color:var(--accent-dark); border-color:var(--accent-border); }
+    .btn.subtle:hover { background:#ffedd5; }
+    .btn.quiet { border-color:transparent; background:transparent; color:var(--accent); padding-left:8px; padding-right:8px; }
+    .btn.sm { min-height:32px; padding:4px 10px; font-size:12.5px; border-radius:6px; }
+    .kpi-wrap { max-width:1520px; margin:auto; padding:16px 28px 0; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .kpi { background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 15px; text-align:left; width:100%; display:block; }
+    .kpi.clickable:hover { border-color:#94a3b8; background:#fafcff; }
+    .kpi-label { font-size:12px; color:var(--muted); display:block; margin-bottom:2px; }
+    .kpi-value { font-size:22px; font-weight:750; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.25; }
+    .kpi-sub { font-size:12px; color:var(--muted); display:block; margin-top:3px; }
+    .kpi.actionable { border-left:4px solid var(--accent); }
+    .kpi.auto { border-left:4px solid var(--green); }
+    .kpi.risk { border-left:4px solid #d97706; }
+    .kpi.cus { border-left:4px solid var(--blue); }
+    .audit-note { margin:10px 2px 0; font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .layout { max-width:1520px; margin:auto; padding:18px 28px 36px; display:grid; grid-template-columns:270px minmax(0,1fr); gap:22px; align-items:start; }
+    .rail { position:sticky; top:16px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; }
+    .progress-label { display:flex; justify-content:space-between; gap:10px; margin-bottom:7px; font-size:13.5px; font-weight:600; }
+    progress { appearance:none; width:100%; height:6px; border:0; display:block; background:#e5eaf0; border-radius:8px; }
+    progress::-webkit-progress-bar { background:#e5eaf0; border-radius:8px; }
+    progress::-webkit-progress-value { background:var(--accent); border-radius:8px; }
+    progress::-moz-progress-bar { background:var(--accent); }
+    .save-state { margin:7px 0 12px; font-size:12px; color:var(--muted); }
+    .filters { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; }
+    .pill { border:1px solid var(--line); background:#f8fafc; color:var(--text); border-radius:999px; padding:3px 9px; font-size:12px; font-weight:600; }
+    .pill[aria-pressed="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .filter-toggle { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); margin:0 0 10px; cursor:pointer; }
+    .navlist { display:grid; gap:4px; max-height:60vh; overflow:auto; padding-right:4px; }
+    .navitem { display:grid; grid-template-columns:22px 1fr 18px; gap:7px; text-align:left; align-items:start; border:1px solid transparent; background:transparent; padding:8px; border-radius:8px; color:var(--text); line-height:1.35; width:100%; font-size:13px; }
+    .navitem:hover { background:#f3f6f9; }
+    .navitem[aria-current="step"] { background:var(--accent-soft); border-color:var(--accent-border); color:var(--accent-dark); font-weight:650; }
+    .navitem .num { font-variant-numeric:tabular-nums; color:var(--muted); font-size:12px; padding-top:1px; }
+    .navitem .mark { font-size:13px; color:var(--green); text-align:center; font-weight:700; }
+    .navitem .nav-meta { display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-top:3px; font-size:11px; color:var(--muted); }
+    .mobile-nav { display:none; }
+    main { min-width:0; display:grid; gap:18px; }
+    .badge { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11.5px; font-weight:700; line-height:1.5; }
+    .badge.MAT { background:#e0f2fe; color:#0369a1; }
+    .badge.ANM { background:#fef3c7; color:#92400e; }
+    .badge.TERM { background:#ede9fe; color:#5b21b6; }
+    .badge.D { background:#fce7f3; color:#9d174d; }
+    .badge.CUS { background:#dbeafe; color:#1d4ed8; }
+    .badge.OTHER { background:#e2e8f0; color:#334155; }
+    .badge.count { background:#eef2f6; color:#334155; font-weight:600; }
+    .badge.rec { background:var(--green-soft); color:var(--green); border:1px solid #99f6e4; }
+    .review { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    .issue-head { padding:20px 24px 16px; border-bottom:1px solid var(--line); }
+    .head-badges { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-bottom:7px; }
+    .eyebrow { color:var(--muted); font-size:12.5px; margin:0; }
+    h2 { color:var(--ink); font-size:21px; line-height:1.4; margin:0 0 8px; font-weight:700; }
+    .question { margin:0; max-width:980px; }
+    .impact-bar { margin-top:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--ink); display:flex; gap:14px; flex-wrap:wrap; }
+    .internal-note { margin-top:10px; padding:9px 12px; background:var(--amber-soft); border:1px solid #fcd34d; border-radius:8px; font-size:13px; color:#78350f; }
+    .issue-body { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(320px,.9fr); }
+    .evidence { padding:20px 22px 22px; background:#fafbfc; border-right:1px solid var(--line); min-width:0; }
+    .section-label { font-size:13.5px; font-weight:700; margin:0 0 9px; color:var(--ink); }
+    .values { width:100%; border-collapse:collapse; margin-bottom:14px; font-size:13.5px; background:#fff; border:1px solid var(--line); }
+    .values th,.values td { padding:8px 11px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; overflow-wrap:anywhere; }
+    .values th { width:38%; font-weight:550; color:var(--muted); background:#f8fafc; }
+    .values td { font-weight:600; color:var(--ink); }
+    .source-meta { margin:0 0 14px; padding:10px 12px; background:#fff; border:1px solid var(--line); border-radius:8px; display:grid; gap:5px; font-size:12.5px; }
+    .source-meta-row { display:grid; grid-template-columns:96px minmax(0,1fr); gap:8px; align-items:baseline; }
+    .source-meta dt { color:var(--muted); font-weight:550; }
+    .source-meta dd { margin:0; color:var(--ink); overflow-wrap:anywhere; word-break:break-word; }
+    .mono { font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace; font-size:12px; }
+    .vault-links { display:flex; gap:6px; flex-wrap:wrap; }
+    .vault-chip { display:inline-block; padding:2px 8px; border-radius:6px; background:#eef2f6; color:var(--ink); font-size:12px; }
+    .members-box { margin:0 0 16px; background:#fff; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+    .members-head { padding:10px 12px; background:#f8fafc; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+    .members-head strong { font-size:13px; color:var(--ink); }
+    .members-tools { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .member-search { width:100%; padding:7px 10px; border:0; border-bottom:1px solid var(--line); font-size:13px; background:#fff; }
+    .members-list { max-height:360px; overflow:auto; padding:8px; display:grid; gap:6px; }
+    .members-list.has-thumbs { grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); }
+    .member-item { display:grid; grid-template-columns:18px minmax(0,1fr); gap:8px; align-items:start; padding:8px; border:1px solid var(--line); border-radius:7px; background:#fff; font-size:12.5px; }
+    .member-item.unchecked { opacity:.58; background:#f8fafc; }
+    .member-item input[type="checkbox"] { margin:2px 0 0; width:15px; height:15px; accent-color:var(--accent); }
+    .member-title { font-weight:650; color:var(--ink); display:block; overflow-wrap:anywhere; }
+    .member-detail { color:var(--muted); font-size:12px; display:block; margin-top:2px; overflow-wrap:anywhere; }
+    .member-thumb { margin-top:6px; padding:0; border:1px solid #cbd5e1; border-radius:5px; overflow:hidden; background:#fff; width:100%; display:block; }
+    .member-thumb img { display:block; width:100%; max-height:120px; object-fit:contain; background:#f8fafc; }
+    .web-evidence { margin:0 0 12px; padding:11px; background:#fff; border:1px solid var(--line); border-radius:8px; }
+    .web-evidence a { color:var(--blue); overflow-wrap:anywhere; }
+    .evidence-caption { margin:0 0 6px; color:var(--muted); font-size:12px; font-weight:650; }
+    .web-excerpt { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 0; line-height:1.55; font-size:13.5px; }
+    .web-excerpt mark { background:#fef08a; color:inherit; padding:1px 0; }
+    figure { margin:0 0 14px; }
+    figure:last-child { margin-bottom:0; }
+    .image-button { display:block; padding:0; border:1px solid #cbd5e1; border-radius:7px; overflow:hidden; background:#fff; width:100%; }
+    .image-button:hover { border-color:var(--accent); }
+    .image-button img { display:block; width:100%; height:auto; }
+    figcaption { font-size:12px; color:var(--muted); margin-top:5px; overflow-wrap:anywhere; }
+    .answers { padding:20px 22px 22px; min-width:0; }
+    .rec-box { margin:0 0 14px; padding:11px 13px; background:var(--green-soft); border:1px solid #99f6e4; border-radius:9px; font-size:13px; color:#115e59; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .rec-box p { margin:0; }
+    fieldset { border:0; padding:0; margin:0; min-width:0; }
+    legend { padding:0; }
+    .choices { display:grid; gap:8px; }
+    .choice { display:grid; grid-template-columns:18px 1fr; gap:9px; align-items:start; padding:11px 12px; border:1px solid var(--line); border-radius:8px; cursor:pointer; background:#fff; }
+    .choice:hover { border-color:#fdba74; background:#fffaf5; }
+    .choice:has(input:checked) { border-color:var(--accent); background:var(--accent-soft); }
+    .choice input { margin:4px 0 0; accent-color:var(--accent); width:16px; height:16px; }
+    .choice-top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .choice-title { font-weight:650; color:var(--ink); line-height:1.45; }
+    .choice-detail { display:block; color:var(--muted); font-size:12px; line-height:1.55; margin-top:2px; }
+    .corrections { padding-top:14px; }
+    .field { display:block; margin:0 0 11px; font-size:13px; font-weight:600; }
+    .field input,.field textarea { width:100%; margin-top:4px; display:block; padding:9px 10px; border:1px solid #cbd5e1; border-radius:7px; color:var(--ink); background:#fff; font-weight:400; font-size:13.5px; }
+    .field textarea { resize:vertical; min-height:74px; line-height:1.55; }
+    .detail-note { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+    .detail-note summary { color:var(--accent); cursor:pointer; font-size:13px; font-weight:600; }
+    .detail-note .field { margin-top:10px; }
+    .error { color:var(--danger); font-size:13px; margin:10px 0 0; padding:9px 10px; background:var(--danger-soft); border-radius:6px; }
+    .issue-footer { padding:13px 22px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:12px; background:#fafbfc; }
+    .issue-counter { color:var(--muted); font-size:13px; }
+    .pager { display:flex; gap:8px; }
+    .empty-card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:26px; }
+    .empty-card h2 { margin-bottom:6px; }
+    .audit-drawers { display:grid; gap:10px; }
+    .drawer { background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    .drawer summary { padding:13px 18px; cursor:pointer; font-weight:650; color:var(--ink); display:flex; justify-content:space-between; align-items:center; gap:10px; background:#fafbfc; }
+    .drawer[open] summary { border-bottom:1px solid var(--line); }
+    .drawer-body { padding:14px 18px; display:grid; gap:10px; }
+    .audit-row { padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; font-size:13px; }
+    .audit-row-head { display:flex; justify-content:space-between; gap:10px; align-items:baseline; flex-wrap:wrap; margin-bottom:4px; }
+    .audit-row p { margin:3px 0 0; color:var(--muted); font-size:12.5px; }
+    .audit-members { margin:6px 0 0; padding-left:18px; font-size:12px; color:var(--text); }
+    .summary-view { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+    .reviewer-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:620px; margin:16px 0 10px; }
+    .summary-table { width:100%; border-collapse:collapse; margin:14px 0 18px; font-size:13.5px; }
+    .summary-table th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; }
+    .summary-table th,.summary-table td { padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+    .summary-table td:first-child { width:44%; }
+    .summary-table button { border:0; background:transparent; text-align:left; color:var(--accent); font-weight:600; padding:0; }
+    .summary-small { display:block; font-size:12px; color:var(--muted); margin-top:3px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .download-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .return-help { margin:12px 0 0; color:var(--muted); font-size:13px; }
+    .toast { position:fixed; right:22px; bottom:22px; max-width:min(520px,calc(100% - 32px)); background:var(--ink); color:#fff; border-radius:9px; padding:12px 16px; z-index:50; box-shadow:0 5px 20px #0f172a33; font-size:13.5px; }
+    dialog { border:0; border-radius:10px; max-width:min(96vw,1450px); max-height:94vh; padding:0; box-shadow:0 12px 50px #0f172a55; background:#fff; }
+    dialog::backdrop { background:#0f172aa8; }
+    .modal-bar { padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); }
+    .modal-bar p { margin:0; font-size:13px; }
+    .zoom-area { overflow:auto; max-height:80vh; padding:16px; }
+    .zoom-area img { display:block; width:auto; max-width:none; height:auto; }
+    .no-script { max-width:900px; padding:24px; margin:24px auto; background:#fff; }
+    @media (max-width:1120px) { .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .layout { grid-template-columns:220px minmax(0,1fr); padding:16px 18px 30px; } .issue-body { grid-template-columns:1fr; } .evidence { border-right:0; border-bottom:1px solid var(--line); } }
+    @media (max-width:740px) { .kpi-grid { grid-template-columns:1fr; } .top-inner,.kpi-wrap,.internal-banner-inner { padding-left:14px; padding-right:14px; } .layout { display:block; padding:14px 12px 28px; } .rail { position:static; margin-bottom:14px; } .navlist { display:none; } .mobile-nav { display:block; width:100%; padding:9px; border:1px solid #c0cbd5; border-radius:7px; background:#fff; margin-top:6px; } .reviewer-fields { grid-template-columns:1fr; gap:0; } }
+  </style>
+</head>
+<body>
+  <div class="internal-banner" role="region" aria-label="内部审核警示">
+    <div class="internal-banner-inner">
+      <span class="tag">⚠ 内部审核专用 · 严禁发给客户</span>
+      <span class="meta" id="banner-meta"></span>
+    </div>
+  </div>
+  <header class="top">
+    <div class="top-inner">
+      <div>
+        <p class="brandline" id="brandline"></p>
+        <h1 id="page-title">内部待办决策页</h1>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn subtle" id="apply-all-rec">按推荐预填未决组</button>
+        <button type="button" class="btn" id="summary-button">检查决策汇总</button>
+        <button type="button" class="btn primary" id="export-top">导出决策 JSON</button>
+      </div>
+    </div>
+  </header>
+  <section class="kpi-wrap" aria-label="待办与审计统计">
+    <div class="kpi-grid">
+      <div class="kpi actionable">
+        <span class="kpi-label">待内部决定（事项组）</span>
+        <span class="kpi-value" id="kpi-actionable">0 组</span>
+        <span class="kpi-sub" id="kpi-decided-sub">已决定 0 / 0 组</span>
+      </div>
+      <button type="button" class="kpi auto clickable" id="kpi-auto-btn">
+        <span class="kpi-label">自动结案（默认折叠）</span>
+        <span class="kpi-value" id="kpi-auto">0 组</span>
+        <span class="kpi-sub">点击展开规则命中审计</span>
+      </button>
+      <button type="button" class="kpi risk clickable" id="kpi-risk-btn">
+        <span class="kpi-label">风险保留（不计入待办）</span>
+        <span class="kpi-value" id="kpi-risk">0 组</span>
+        <span class="kpi-sub">仍带 ⚠ 使用 · 点击查看清单</span>
+      </button>
+      <button type="button" class="kpi cus clickable" id="kpi-cus-btn">
+        <span class="kpi-label">客户确认（CUS）</span>
+        <span class="kpi-value" id="kpi-cus">0 组</span>
+        <span class="kpi-sub" id="kpi-cus-sub">待汇总 0 · 已发待答 0</span>
+      </button>
+    </div>
+    <div class="audit-note">
+      <span id="instructions">按事项组做内部决定；大量页码、词项或尺寸图已聚合为组内明细，可整组采纳并取消个别项。</span>
+      <span id="audit-evidence-total"></span>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="rail" aria-label="待决事项组导航">
+      <div class="progress-label"><span id="progress-label">已决定 0 / 0 组</span><span id="progress-percent">0%</span></div>
+      <progress id="progress" value="0" max="1" aria-label="决策进度"></progress>
+      <p class="save-state" id="save-state">决定自动保存在当前浏览器</p>
+      <div class="filters" id="ledger-filters" aria-label="按台账筛选"></div>
+      <label class="filter-toggle"><input type="checkbox" id="only-undecided"> 仅显示未决定组</label>
+      <select id="mobile-nav" class="mobile-nav" aria-label="切换事项组"></select>
+      <nav id="navlist" class="navlist" aria-label="待决事项组"></nav>
+    </aside>
+
+    <main>
+      <section class="empty-card" id="empty-card" hidden>
+        <h2>当前无待内部决定的事项组</h2>
+        <p class="eyebrow">所有已检查项目均已完成自动结案、转入风险保留或归入 CUS 客户确认。你可以在下方折叠抽屉中抽查审计明细。</p>
+      </section>
+
+      <section class="review" id="review-view" aria-labelledby="issue-title" hidden>
+        <div class="issue-head">
+          <div class="head-badges" id="head-badges"></div>
+          <p class="eyebrow" id="product"></p>
+          <h2 id="issue-title" tabindex="-1"></h2>
+          <p class="question" id="question"></p>
+          <div class="impact-bar" id="impact-bar" hidden></div>
+          <div class="internal-note" id="internal-note" hidden></div>
+        </div>
+        <div class="issue-body">
+          <section class="evidence" aria-label="组内证据与来源">
+            <p class="section-label" id="values-title" hidden>关键对比与参数</p>
+            <table class="values" id="values-table" hidden><tbody id="original-values"></tbody></table>
+            <dl class="source-meta" id="source-meta" hidden></dl>
+            <div class="members-box" id="members-box" hidden>
+              <div class="members-head">
+                <strong id="members-count">组内明细</strong>
+                <div class="members-tools">
+                  <button type="button" class="btn sm" id="members-all">全选</button>
+                  <button type="button" class="btn sm" id="members-none">取消全选</button>
+                  <button type="button" class="btn sm" id="members-invert">反选</button>
+                </div>
+              </div>
+              <input type="search" class="member-search" id="member-search" placeholder="筛选组内条目（词项、页码、文件名或说明）..." hidden>
+              <div class="members-list" id="members-list"></div>
+            </div>
+            <div id="evidence-section" hidden>
+              <p class="section-label">代表性证据（点击图片可放大）</p>
+              <div id="evidence-images"></div>
+            </div>
+          </section>
+
+          <form id="answer-form" class="answers" novalidate>
+            <div class="rec-box" id="rec-box" hidden>
+              <div>
+                <p><strong id="rec-title"></strong></p>
+                <p id="rec-reason"></p>
+              </div>
+              <button type="button" class="btn sm subtle" id="apply-one-rec">应用推荐</button>
+            </div>
+            <fieldset>
+              <legend class="section-label">内部处理决定</legend>
+              <div id="choices" class="choices"></div>
+            </fieldset>
+            <div class="corrections" id="corrections" hidden>
+              <p class="section-label">请补充执行参数 / 客户问法</p>
+              <div id="correction-fields"></div>
+            </div>
+            <details class="detail-note" id="additional-details">
+              <summary>处理记录 / 适用范围（选填）</summary>
+              <label class="field">适用范围<input id="applicability" type="text" maxlength="2000" placeholder="例如：仅本份规格书 / 全项目通用"></label>
+              <label class="field">内部处理备注<textarea id="note" rows="3" maxlength="10000" placeholder="记录判断依据、例外原因或后续跟进要求"></textarea></label>
+            </details>
+            <p class="error" id="answer-error" role="alert" hidden></p>
+          </form>
+        </div>
+        <div class="issue-footer">
+          <span id="issue-counter" class="issue-counter"></span>
+          <div class="pager">
+            <button class="btn" type="button" id="previous">上一组</button>
+            <button class="btn primary" type="button" id="next">下一组</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="summary-view" class="summary-view" aria-labelledby="summary-title" hidden>
+        <h2 id="summary-title" tabindex="-1">检查并导出内部决策（governance-decisions.json）</h2>
+        <p id="summary-description" class="eyebrow"></p>
+        <div class="reviewer-fields">
+          <label class="field">审核人（选填）<input id="reviewer-name" type="text" maxlength="200" placeholder="知识库专员姓名"></label>
+          <label class="field">角色 / 团队（选填）<input id="reviewer-team" type="text" maxlength="200" placeholder="例如：知识库治理"></label>
+        </div>
+        <table class="summary-table">
+          <thead><tr><th>事项组</th><th>内部决定与作用范围</th><th>状态</th></tr></thead>
+          <tbody id="summary-rows"></tbody>
+        </table>
+        <div class="download-actions">
+          <button class="btn primary" type="button" id="export-bottom">导出 governance-decisions.json</button>
+          <button class="btn quiet" type="button" id="import-button">导入已填决策 JSON</button>
+        </div>
+        <p class="return-help">导出后交给 <code>governance.py collect</code> 校验并落盘，再重跑受影响步骤。本页及导出的 JSON 仅供内部使用，切勿发给客户。</p>
+      </section>
+
+      <section class="audit-drawers" aria-label="已自动处置、风险保留与 CUS 审计抽屉">
+        <details class="drawer" id="drawer-auto">
+          <summary><span>自动结案记录（按版本化规则自动关闭）</span><span class="badge count" id="drawer-auto-count">0 组</span></summary>
+          <div class="drawer-body" id="drawer-auto-body"></div>
+        </details>
+        <details class="drawer" id="drawer-risk">
+          <summary><span>风险保留清单（仍带 ⚠ 使用，不计入待办）</span><span class="badge count" id="drawer-risk-count">0 组</span></summary>
+          <div class="drawer-body" id="drawer-risk-body"></div>
+        </details>
+        <details class="drawer" id="drawer-cus">
+          <summary><span>客户确认（CUS）概览</span><span class="badge count" id="drawer-cus-count">0 组</span></summary>
+          <div class="drawer-body" id="drawer-cus-body"></div>
+        </details>
+      </section>
+    </main>
+  </div>
+
+  <input id="import-file" type="file" accept="application/json,.json" hidden>
+  <dialog id="image-dialog" aria-label="放大证据截图">
+    <div class="modal-bar"><p id="image-caption"></p><button type="button" class="btn sm" id="image-close">关闭</button></div>
+    <div class="zoom-area"><img id="zoom-image" alt=""></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="no-script">请在 Chrome、Edge 或其他支持 JavaScript 的现代浏览器中打开此内部决策页。</p></noscript>
+  <script id="review-data" type="application/json">__REVIEW_DATA__</script>
+  <script>
+    'use strict';
+    const data = JSON.parse(document.getElementById('review-data').textContent);
+    const byId = new Map(data.issues.map(item => [item.id, item]));
+    const storageKey = 'internal-governance-review:' + data.projectId + ':' + data.revision;
+    const decisionsSchema = 'governance-decisions.v1';
+    const $ = id => document.getElementById(id);
+    const freshDecision = item => ({
+      decision: '',
+      values: {},
+      applicability: '',
+      note: '',
+      selectedMembers: item.members.filter(m => m.selected !== false).map(m => m.memberId),
+      updatedAt: ''
+    });
+    let decisions = Object.fromEntries(data.issues.map(item => [item.id, freshDecision(item)]));
+    let reviewer = { name: '', team: '' };
+    let currentIndex = 0;
+    let showingSummary = false;
+    let activeLedger = 'ALL';
+    let onlyUndecided = false;
+    let storageAvailable = true;
+    let toastTimer;
+
+    function textEl(tag, text, className) {
+      const el = document.createElement(tag);
+      el.textContent = text;
+      if (className) el.className = className;
+      return el;
+    }
+
+    function cleanDecision(item, input) {
+      const state = freshDecision(item);
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return state;
+      if (item.choices.some(c => c.value === input.decision)) state.decision = input.decision;
+      for (const field of item.fields) {
+        const val = input.values && input.values[field.key];
+        if (typeof val === 'string') state.values[field.key] = val.slice(0, 10000);
+      }
+      if (typeof input.applicability === 'string') state.applicability = input.applicability.slice(0, 2000);
+      if (typeof input.note === 'string') state.note = input.note.slice(0, 10000);
+      if (typeof input.updatedAt === 'string') state.updatedAt = input.updatedAt.slice(0, 80);
+      if (Array.isArray(input.selectedMembers) && item.members.length) {
+        const validIds = new Set(item.members.map(m => m.memberId));
+        state.selectedMembers = input.selectedMembers.filter(id => typeof id === 'string' && validIds.has(id));
+      }
+      return state;
+    }
+
+    function restore() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        if (!stored || stored.revision !== data.revision) return;
+        for (const item of data.issues) decisions[item.id] = cleanDecision(item, stored.decisions && stored.decisions[item.id]);
+        reviewer.name = typeof stored.reviewer?.name === 'string' ? stored.reviewer.name.slice(0, 200) : '';
+        reviewer.team = typeof stored.reviewer?.team === 'string' ? stored.reviewer.team.slice(0, 200) : '';
+        const idx = data.issues.findIndex(item => item.id === stored.currentId);
+        if (idx >= 0) currentIndex = idx;
+      } catch (err) {
+        storageAvailable = false;
+      }
+    }
+
+    function save() {
+      try {
+        const currentId = data.issues[currentIndex] ? data.issues[currentIndex].id : '';
+        localStorage.setItem(storageKey, JSON.stringify({ revision: data.revision, decisions, reviewer, currentId }));
+        storageAvailable = true;
+        $('save-state').textContent = '决定已保存在当前浏览器';
+      } catch (err) {
+        storageAvailable = false;
+        $('save-state').textContent = '当前浏览器无法暂存，请及时导出 JSON';
+      }
+      updateProgress();
+    }
+
+    function needsCorrection(item, state) {
+      return state.decision === 'revise' || item.choices.some(c =>
+        c.value === state.decision && (c.requiresCorrection === true || c.correctionField));
+    }
+
+    function activeFields(item, state) {
+      if (!needsCorrection(item, state)) return [];
+      const dedicated = item.choices.find(c => c.value === state.decision)?.correctionField;
+      if (dedicated) return item.fields.filter(f => f.key === dedicated);
+      return item.fields.filter(f => !item.choices.some(c => c.correctionField === f.key));
+    }
+
+    function decisionError(item, state) {
+      if (!state.decision) return '';
+      const fields = activeFields(item, state);
+      if (needsCorrection(item, state) && !fields.some(f => (state.values[f.key] || '').trim())) {
+        return fields.length === 1 ? '请填写「' + fields[0].label + '」。' : '请补充必填的执行参数或说明。';
+      }
+      return '';
+    }
+
+    function isComplete(item) {
+      const state = decisions[item.id];
+      return Boolean(state.decision) && !decisionError(item, state);
+    }
+
+    function filteredIssues() {
+      return data.issues.filter(item => {
+        if (activeLedger !== 'ALL' && item.ledger !== activeLedger) return false;
+        if (onlyUndecided && isComplete(item)) return false;
+        return true;
+      });
+    }
+
+    function labelFor(item, state) {
+      return item.choices.find(c => c.value === state.decision)?.label || '未决定';
+    }
+
+    function updateProgress() {
+      const total = data.issues.length;
+      const done = data.issues.filter(isComplete).length;
+      $('progress-label').textContent = '已决定 ' + done + ' / ' + total + ' 组';
+      $('progress-percent').textContent = total ? Math.round(100 * done / total) + '%' : '100%';
+      $('progress').max = Math.max(total, 1);
+      $('progress').value = total ? done : 1;
+      $('kpi-decided-sub').textContent = '已决定 ' + done + ' / ' + total + ' 组';
+      renderNavList();
+    }
+
+    function buildFilters() {
+      const container = $('ledger-filters');
+      container.replaceChildren();
+      const ledgers = ['ALL', ...new Set(data.issues.map(item => item.ledger))];
+      for (const ledger of ledgers) {
+        const count = ledger === 'ALL' ? data.issues.length : data.issues.filter(i => i.ledger === ledger).length;
+        const btn = textEl('button', (ledger === 'ALL' ? '全部' : ledger) + ' ' + count, 'pill');
+        btn.type = 'button';
+        btn.setAttribute('aria-pressed', ledger === activeLedger ? 'true' : 'false');
+        btn.addEventListener('click', () => {
+          activeLedger = ledger;
+          for (const child of container.children) child.setAttribute('aria-pressed', child === btn ? 'true' : 'false');
+          const visible = filteredIssues();
+          if (visible.length && !showingSummary) {
+            const cur = data.issues[currentIndex];
+            if (!cur || !visible.includes(cur)) showIssue(data.issues.indexOf(visible[0]), false);
+          }
+          renderNavList();
+        });
+        container.append(btn);
+      }
+    }
+
+    function renderNavList() {
+      const nav = $('navlist');
+      const mobile = $('mobile-nav');
+      nav.replaceChildren();
+      mobile.replaceChildren();
+      const visible = filteredIssues();
+      for (const item of visible) {
+        const index = data.issues.indexOf(item);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'navitem';
+        btn.dataset.id = item.id;
+        btn.setAttribute('aria-current', !showingSummary && index === currentIndex ? 'step' : 'false');
+        btn.append(textEl('span', String(index + 1).padStart(2, '0'), 'num'));
+        const body = document.createElement('span');
+        body.append(textEl('span', item.title));
+        const meta = document.createElement('span');
+        meta.className = 'nav-meta';
+        meta.append(textEl('span', item.ledger, 'badge ' + item.ledger));
+        meta.append(textEl('span', item.evidenceCount + ' 证据', 'badge count'));
+        body.append(meta);
+        btn.append(body);
+        btn.append(textEl('span', isComplete(item) ? '✓' : (item.recommendedAction ? '•' : ''), 'mark'));
+        btn.addEventListener('click', () => showIssue(index, true));
+        nav.append(btn);
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = (isComplete(item) ? '✓ ' : '') + (index + 1) + '. [' + item.ledger + '] ' + item.title + ' (' + item.evidenceCount + ' 证据)';
+        mobile.append(opt);
+      }
+      if (!visible.length) {
+        nav.append(textEl('p', '当前筛选条件下没有事项组。', 'save-state'));
+      } else if (data.issues[currentIndex] && visible.includes(data.issues[currentIndex])) {
+        mobile.value = data.issues[currentIndex].id;
+      }
+    }
+
+    function renderMembers(item, state) {
+      const box = $('members-box');
+      if (!item.members.length) { box.hidden = true; return; }
+      box.hidden = false;
+      const list = $('members-list');
+      const search = $('member-search');
+      search.hidden = item.members.length <= 8;
+      search.value = '';
+      const selectedSet = new Set(state.selectedMembers);
+      const hasThumbs = item.members.some(m => m.image);
+      list.classList.toggle('has-thumbs', hasThumbs);
+
+      const updateCount = () => {
+        $('members-count').textContent = '组内明细（已勾选 ' + state.selectedMembers.length + ' / 共 ' + item.members.length + ' 项）';
+      };
+
+      const paint = (query='') => {
+        const q = query.trim().toLowerCase();
+        list.replaceChildren();
+        for (const member of item.members) {
+          const haystack = [member.label, member.detail, member.sourceName, member.location, member.memberId].filter(Boolean).join(' ').toLowerCase();
+          if (q && !haystack.includes(q)) continue;
+          const checked = selectedSet.has(member.memberId);
+          const row = document.createElement('label');
+          row.className = 'member-item' + (checked ? '' : ' unchecked');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = checked;
+          cb.addEventListener('change', () => {
+            if (cb.checked) selectedSet.add(member.memberId); else selectedSet.delete(member.memberId);
+            state.selectedMembers = item.members.filter(m => selectedSet.has(m.memberId)).map(m => m.memberId);
+            state.updatedAt = new Date().toISOString();
+            row.classList.toggle('unchecked', !cb.checked);
+            updateCount();
+            save();
+          });
+          const info = document.createElement('span');
+          info.append(textEl('span', member.label, 'member-title'));
+          const sub = [member.sourceName, member.location, member.detail].filter(Boolean).join(' · ');
+          if (sub) info.append(textEl('span', sub, 'member-detail'));
+          if (member.meta && member.meta.length) {
+            info.append(textEl('span', member.meta.map(([k, v]) => k + ': ' + v).join(' | '), 'member-detail mono'));
+          }
+          if (member.image) {
+            const thumbBtn = document.createElement('button');
+            thumbBtn.type = 'button';
+            thumbBtn.className = 'member-thumb';
+            thumbBtn.setAttribute('aria-label', '放大查看 ' + member.label);
+            const img = document.createElement('img');
+            img.src = member.image;
+            img.alt = member.label;
+            thumbBtn.append(img);
+            thumbBtn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); showImage({ caption: member.label, image: member.image, width: member.width, height: member.height }, img); });
+            info.append(thumbBtn);
+          }
+          row.append(cb, info);
+          list.append(row);
+        }
+        updateCount();
+      };
+
+      $('members-all').onclick = () => {
+        selectedSet.clear();
+        for (const m of item.members) selectedSet.add(m.memberId);
+        state.selectedMembers = item.members.map(m => m.memberId);
+        state.updatedAt = new Date().toISOString();
+        paint(search.value); save();
+      };
+      $('members-none').onclick = () => {
+        selectedSet.clear();
+        state.selectedMembers = [];
+        state.updatedAt = new Date().toISOString();
+        paint(search.value); save();
+      };
+      $('members-invert').onclick = () => {
+        const next = [];
+        for (const m of item.members) {
+          if (selectedSet.has(m.memberId)) selectedSet.delete(m.memberId);
+          else { selectedSet.add(m.memberId); next.push(m.memberId); }
+        }
+        state.selectedMembers = next;
+        state.updatedAt = new Date().toISOString();
+        paint(search.value); save();
+      };
+      search.oninput = () => paint(search.value);
+      paint();
+    }
+
+    function updateCorrectionVisibility() {
+      const item = data.issues[currentIndex];
+      if (!item) return;
+      const fields = activeFields(item, decisions[item.id]);
+      $('corrections').hidden = fields.length === 0;
+      for (const label of $('correction-fields').children) {
+        label.hidden = !fields.some(f => f.key === label.querySelector('textarea').dataset.key);
+      }
+    }
+
+    function showIssue(index, focus=false) {
+      if (!data.issues.length) {
+        $('empty-card').hidden = false;
+        $('review-view').hidden = true;
+        $('summary-view').hidden = true;
+        $('drawer-auto').open = Boolean(data.autoResolved.length);
+        $('drawer-risk').open = Boolean(data.riskRetained.length);
+        updateProgress();
+        return;
+      }
+      currentIndex = Math.max(0, Math.min(data.issues.length - 1, index));
+      showingSummary = false;
+      const item = data.issues[currentIndex];
+      const state = decisions[item.id];
+      $('empty-card').hidden = true;
+      $('review-view').hidden = false;
+      $('summary-view').hidden = true;
+
+      const badges = $('head-badges');
+      badges.replaceChildren();
+      badges.append(textEl('span', item.ledger, 'badge ' + item.ledger));
+      if (item.category) badges.append(textEl('span', item.category, 'badge count'));
+      badges.append(textEl('span', '涉及 ' + item.evidenceCount + ' 条证据', 'badge count'));
+      badges.append(textEl('span', item.id, 'badge count mono'));
+      if (item.ruleVersion) badges.append(textEl('span', '规则 ' + item.ruleVersion, 'badge count'));
+
+      $('product').textContent = [item.product, item.owner ? '负责人：' + item.owner : '', item.rootKey !== item.id ? '根因键：' + item.rootKey : ''].filter(Boolean).join(' · ');
+      $('issue-title').textContent = item.title;
+      $('question').textContent = item.question;
+
+      const impact = $('impact-bar');
+      impact.replaceChildren();
+      if (item.impactSummary) {
+        impact.hidden = false;
+        impact.append(textEl('span', '影响范围：' + item.impactSummary));
+      } else {
+        impact.hidden = true;
+      }
+      if (item.internalNote) {
+        $('internal-note').hidden = false;
+        $('internal-note').textContent = '内部备注：' + item.internalNote;
+      } else {
+        $('internal-note').hidden = true;
+      }
+
+      $('values-title').hidden = !item.originalValues.length;
+      $('values-table').hidden = !item.originalValues.length;
+      $('original-values').replaceChildren();
+      for (const [label, val] of item.originalValues) {
+        const row = document.createElement('tr');
+        const th = textEl('th', label); th.scope = 'row';
+        row.append(th, textEl('td', val));
+        $('original-values').append(row);
+      }
+
+      const meta = $('source-meta');
+      meta.replaceChildren();
+      const metaEntries = [];
+      if (item.sourceName) metaEntries.push(['来源资料', item.sourceName, false]);
+      if (item.sourceLocation) metaEntries.push(['具体位置', item.sourceLocation, false]);
+      if (item.sourcePath) metaEntries.push(['文件路径', item.sourcePath, true]);
+      for (const [k, v, isMono] of metaEntries) {
+        const row = document.createElement('div'); row.className = 'source-meta-row';
+        row.append(textEl('dt', k), textEl('dd', v, isMono ? 'mono' : ''));
+        meta.append(row);
+      }
+      if (item.vaultLinks && item.vaultLinks.length) {
+        const row = document.createElement('div'); row.className = 'source-meta-row';
+        row.append(textEl('dt', '知识库链接'));
+        const dd = document.createElement('dd');
+        dd.className = 'vault-links';
+        for (const link of item.vaultLinks) {
+          const chip = textEl('span', link.label, 'vault-chip mono');
+          chip.title = link.path;
+          dd.append(chip);
+        }
+        row.append(dd);
+        meta.append(row);
+      }
+      meta.hidden = meta.children.length === 0;
+
+      renderMembers(item, state);
+
+      const evSec = $('evidence-section');
+      const evContainer = $('evidence-images');
+      evContainer.replaceChildren();
+      evSec.hidden = item.evidence.length === 0;
+      for (const ev of item.evidence) {
+        let box = evContainer;
+        if (ev.sourceUrl || ev.excerpt || !ev.image) {
+          box = document.createElement('article');
+          box.className = 'web-evidence';
+          evContainer.append(box);
+          box.append(textEl('p', ev.caption, 'evidence-caption'));
+          if (ev.sourceName || ev.location || ev.sourceUrl) {
+            const sub = [ev.sourceName, ev.location, ev.capturedAt].filter(Boolean).join(' · ');
+            if (sub) box.append(textEl('p', sub, 'member-detail'));
+            if (ev.sourceUrl) {
+              const a = textEl('a', ev.sourceUrl, 'member-detail');
+              a.href = ev.sourceUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+              box.append(a);
+            }
+          }
+        }
+        if (ev.excerpt) {
+          const bq = document.createElement('blockquote');
+          bq.className = 'web-excerpt';
+          const highlights = [...(ev.highlights || [])].sort((a, b) => b.length - a.length);
+          const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          if (highlights.length) {
+            const parts = ev.excerpt.split(new RegExp('(' + highlights.map(esc).join('|') + ')', 'g'));
+            for (let i = 0; i < parts.length; i++) {
+              bq.append(i % 2 ? textEl('mark', parts[i]) : document.createTextNode(parts[i]));
+            }
+          } else {
+            bq.textContent = ev.excerpt;
+          }
+          box.append(bq);
+        }
+        if (ev.image) {
+          const fig = document.createElement('figure');
+          const btn = document.createElement('button');
+          btn.type = 'button'; btn.className = 'image-button';
+          const img = document.createElement('img');
+          img.src = ev.image; img.alt = ev.caption;
+          if (Number.isFinite(ev.width) && ev.width > 0) img.width = ev.width;
+          if (Number.isFinite(ev.height) && ev.height > 0) img.height = ev.height;
+          btn.append(img);
+          btn.addEventListener('click', () => showImage(ev, img));
+          fig.append(btn, textEl('figcaption', ev.caption));
+          box.append(fig);
+        }
+      }
+
+      const recChoice = item.recommendedAction ? item.choices.find(c => c.value === item.recommendedAction) : null;
+      if (recChoice) {
+        $('rec-box').hidden = false;
+        $('rec-title').textContent = '系统建议：' + recChoice.label;
+        $('rec-reason').textContent = item.recommendedReason || recChoice.detail;
+        $('apply-one-rec').onclick = () => {
+          state.decision = recChoice.value;
+          state.updatedAt = new Date().toISOString();
+          showIssue(currentIndex, false);
+          notify('已应用系统建议：' + recChoice.label);
+        };
+      } else {
+        $('rec-box').hidden = true;
+      }
+
+      $('choices').replaceChildren();
+      for (const choice of item.choices) {
+        const label = document.createElement('label'); label.className = 'choice';
+        const input = document.createElement('input');
+        input.type = 'radio'; input.name = 'decision'; input.value = choice.value; input.checked = choice.value === state.decision;
+        const text = document.createElement('span');
+        const top = document.createElement('span'); top.className = 'choice-top';
+        top.append(textEl('span', choice.label, 'choice-title'));
+        if (item.recommendedAction === choice.value) top.append(textEl('span', '推荐', 'badge rec'));
+        if (choice.targetStatus) top.append(textEl('span', '→ ' + choice.targetStatus, 'badge count mono'));
+        text.append(top, textEl('span', choice.detail, 'choice-detail'));
+        label.append(input, text);
+        input.addEventListener('change', () => {
+          state.decision = choice.value; state.updatedAt = new Date().toISOString();
+          $('answer-error').hidden = true; updateCorrectionVisibility(); save();
+        });
+        $('choices').append(label);
+      }
+
+      $('correction-fields').replaceChildren();
+      for (const field of item.fields) {
+        const label = textEl('label', field.label, 'field');
+        const ta = document.createElement('textarea');
+        ta.rows = item.fields.length > 1 ? 2 : 3;
+        ta.maxLength = 10000; ta.placeholder = field.placeholder || '';
+        ta.value = state.values[field.key] || ''; ta.dataset.key = field.key;
+        ta.addEventListener('input', () => { state.values[field.key] = ta.value; state.updatedAt = new Date().toISOString(); $('answer-error').hidden = true; save(); });
+        label.append(ta); $('correction-fields').append(label);
+      }
+
+      $('applicability').value = state.applicability;
+      $('note').value = state.note;
+      $('additional-details').open = Boolean(state.note || state.applicability);
+      $('answer-error').hidden = true;
+      updateCorrectionVisibility();
+      $('issue-counter').textContent = '第 ' + (currentIndex + 1) + ' 组 / 共 ' + data.issues.length + ' 组';
+      $('previous').disabled = currentIndex === 0;
+      $('next').textContent = currentIndex === data.issues.length - 1 ? '检查汇总' : '下一组';
+      save();
+      if (focus) { $('issue-title').focus({ preventScroll: true }); $('review-view').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+
+    function renderAuditDrawers() {
+      const renderList = (records, bodyId, countId, emptyText) => {
+        $(countId).textContent = records.length + ' 组';
+        const body = $(bodyId);
+        body.replaceChildren();
+        if (!records.length) { body.append(textEl('p', emptyText, 'save-state')); return; }
+        for (const rec of records) {
+          const card = document.createElement('div'); card.className = 'audit-row';
+          const head = document.createElement('div'); head.className = 'audit-row-head';
+          const left = document.createElement('span');
+          if (rec.ledger) left.append(textEl('span', rec.ledger, 'badge ' + rec.ledger), document.createTextNode(' '));
+          left.append(textEl('strong', rec.title));
+          const right = textEl('span', [rec.id, rec.ruleVersion ? '规则 ' + rec.ruleVersion : '', rec.evidenceCount + ' 条证据'].filter(Boolean).join(' · '), 'member-detail mono');
+          head.append(left, right);
+          card.append(head);
+          if (rec.reason) card.append(textEl('p', rec.reason));
+          if (rec.riskNote) card.append(textEl('p', '风险说明：' + rec.riskNote));
+          if (rec.members && rec.members.length) {
+            const det = document.createElement('details');
+            det.append(textEl('summary', '查看明细（' + rec.members.length + ' 项）', 'member-detail'));
+            const ul = document.createElement('ul'); ul.className = 'audit-members';
+            for (const m of rec.members) {
+              ul.append(textEl('li', m.detail ? m.label + ' — ' + m.detail : m.label));
+            }
+            det.append(ul);
+            card.append(det);
+          }
+          body.append(card);
+        }
+      };
+      renderList(data.autoResolved, 'drawer-auto-body', 'drawer-auto-count', '本轮没有自动结案记录。');
+      renderList(data.riskRetained, 'drawer-risk-body', 'drawer-risk-count', '本轮没有风险保留记录。');
+
+      const cus = data.cusSummary || { draftGroups: 0, sentGroups: 0, totalGroups: 0, items: [] };
+      $('drawer-cus-count').textContent = cus.totalGroups + ' 组';
+      const cusBody = $('drawer-cus-body');
+      cusBody.replaceChildren();
+      if (!cus.items || !cus.items.length) {
+        cusBody.append(textEl('p', cus.totalGroups ? '待汇总 ' + cus.draftGroups + ' 组，已发待答 ' + cus.sentGroups + ' 组（请使用客户确认网页导出发客户）。' : '暂无待客户确认事项。', 'save-state'));
+      } else {
+        for (const item of cus.items) {
+          const card = document.createElement('div'); card.className = 'audit-row';
+          const head = document.createElement('div'); head.className = 'audit-row-head';
+          const left = document.createElement('span');
+          left.append(textEl('span', item.status || '待汇总', 'badge CUS'), document.createTextNode(' '), textEl('strong', item.title));
+          const right = textEl('span', [item.id, item.batchId ? '批次 ' + item.batchId : '', item.kind, item.evidenceCount + ' 条证据'].filter(Boolean).join(' · '), 'member-detail mono');
+          head.append(left, right);
+          card.append(head);
+          cusBody.append(card);
+        }
+      }
+    }
+
+    function showSummary(focus=true) {
+      showingSummary = true;
+      $('review-view').hidden = true; $('empty-card').hidden = true; $('summary-view').hidden = false;
+      const done = data.issues.filter(isComplete).length;
+      $('summary-description').textContent = '已决定 ' + done + ' 组，共 ' + data.issues.length + ' 组。点击事项组名称可返回修改。';
+      $('reviewer-name').value = reviewer.name; $('reviewer-team').value = reviewer.team;
+      $('summary-rows').replaceChildren();
+      for (const [index, item] of data.issues.entries()) {
+        const state = decisions[item.id];
+        const row = document.createElement('tr');
+        const col1 = document.createElement('td');
+        const btn = textEl('button', '[' + item.ledger + '] ' + item.title); btn.type = 'button';
+        btn.addEventListener('click', () => showIssue(index, true));
+        col1.append(btn, textEl('span', item.id + ' · ' + item.evidenceCount + ' 条证据', 'summary-small mono'));
+        const col2 = textEl('td', labelFor(item, state));
+        const extra = [];
+        if (item.members.length) {
+          const excluded = item.members.length - state.selectedMembers.length;
+          extra.push('勾选 ' + state.selectedMembers.length + ' / ' + item.members.length + ' 项' + (excluded ? '（排除 ' + excluded + ' 项）' : ''));
+        }
+        for (const field of activeFields(item, state)) {
+          if ((state.values[field.key] || '').trim()) extra.push(field.label + '：' + state.values[field.key].trim());
+        }
+        if (state.applicability.trim()) extra.push('范围：' + state.applicability.trim());
+        if (state.note.trim()) extra.push('备注：' + state.note.trim());
+        if (extra.length) col2.append(textEl('span', extra.join('\n'), 'summary-small'));
+        const status = decisionError(item, state) ? '需补字段' : state.decision ? '已决定' : '未决定';
+        row.append(col1, col2, textEl('td', status));
+        $('summary-rows').append(row);
+      }
+      updateProgress();
+      if (focus) { $('summary-title').focus({ preventScroll: true }); $('summary-view').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+
+    function showImage(evidence, thumb) {
+      $('zoom-image').src = evidence.image;
+      $('zoom-image').alt = evidence.caption;
+      $('image-caption').textContent = evidence.caption + ' · 可拖动或滚动查看细节';
+      const nw = (Number.isFinite(evidence.width) && evidence.width > 0) ? evidence.width : (thumb && thumb.naturalWidth) || 0;
+      if (nw > 0) $('zoom-image').style.width = Math.max(900, Math.min(nw, 1320)) + 'px';
+      else $('zoom-image').style.removeProperty('width');
+      $('image-dialog').showModal();
+    }
+
+    function validateForExport() {
+      const badIdx = data.issues.findIndex(item => decisionError(item, decisions[item.id]));
+      if (badIdx >= 0) {
+        showIssue(badIdx, true);
+        $('answer-error').textContent = decisionError(data.issues[badIdx], decisions[data.issues[badIdx].id]);
+        $('answer-error').hidden = false;
+        $('corrections').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return false;
+      }
+      if (data.issues.length && !data.issues.some(isComplete)) {
+        notify('请至少完成一组决定，再导出 governance-decisions.json。');
+        return false;
+      }
+      return true;
+    }
+
+    function exportPayload() {
+      const decidedCount = data.issues.filter(isComplete).length;
+      return {
+        schema: decisionsSchema,
+        mode: 'internal',
+        projectId: data.projectId,
+        reviewRevision: data.revision,
+        exportedAt: new Date().toISOString(),
+        reviewer: { ...reviewer },
+        summary: {
+          totalGroups: data.issues.length,
+          decidedGroups: decidedCount,
+          undecidedGroups: data.issues.length - decidedCount
+        },
+        decisions: data.issues.map(item => {
+          const state = decisions[item.id];
+          const choice = item.choices.find(c => c.value === state.decision);
+          const selectedSet = new Set(state.selectedMembers);
+          return {
+            id: item.id,
+            rootKey: item.rootKey,
+            ledger: item.ledger,
+            category: item.category,
+            decision: state.decision,
+            decisionLabel: labelFor(item, state),
+            ...(choice?.targetStatus ? { targetStatus: choice.targetStatus } : {}),
+            ...(item.ruleVersion ? { ruleVersion: item.ruleVersion } : {}),
+            ...(item.cusId ? { cusId: item.cusId } : {}),
+            ...(item.answerId ? { answerId: item.answerId } : {}),
+            ...(item.members.length ? {
+              selectedMembers: item.members.filter(m => selectedSet.has(m.memberId)).map(m => m.memberId),
+              excludedMembers: item.members.filter(m => !selectedSet.has(m.memberId)).map(m => m.memberId)
+            } : {}),
+            values: Object.fromEntries(activeFields(item, state).map(f => [f.key, state.values[f.key] || ''])),
+            applicability: state.applicability,
+            note: state.note,
+            updatedAt: state.updatedAt
+          };
+        })
+      };
+    }
+
+    function exportDecisions() {
+      if (!validateForExport()) return;
+      const payload = exportPayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2) + '\n'], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      const stamp = new Date().toLocaleDateString('sv-SE').replaceAll('-', '') + '-' + new Date().toTimeString().slice(0, 5).replace(':', '');
+      const prefix = String(data.exportPrefix || data.projectId || 'internal-review').replace(/[\\/:*?"<>|]/g, '-').trim() || 'internal-review';
+      a.download = prefix + '-governance-decisions-' + stamp + '.json';
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      notify('已导出 ' + payload.summary.decidedGroups + ' / ' + payload.summary.totalGroups + ' 组内部决定，可交给 governance.py collect 校验应用。');
+    }
+
+    async function importDecisions(file) {
+      if (!file) return;
+      try {
+        if (file.size > 5000000) throw new Error('文件过大，请选择本页导出的 governance-decisions.json。');
+        const imported = JSON.parse(await file.text());
+        if (imported.schema !== decisionsSchema || imported.projectId !== data.projectId || imported.reviewRevision !== data.revision || !Array.isArray(imported.decisions)) {
+          throw new Error('该决策文件与当前内部决策页的版本不匹配。');
+        }
+        for (const entry of imported.decisions) {
+          if (!entry || typeof entry !== 'object' || !byId.has(entry.id)) throw new Error('决策文件包含无效事项编号。');
+          const item = byId.get(entry.id);
+          if (entry.decision && !item.choices.some(c => c.value === entry.decision)) throw new Error('决策文件包含未定义的操作选项。');
+          decisions[entry.id] = cleanDecision(item, entry);
+        }
+        if (typeof imported.reviewer?.name === 'string') reviewer.name = imported.reviewer.name.slice(0, 200);
+        if (typeof imported.reviewer?.team === 'string') reviewer.team = imported.reviewer.team.slice(0, 200);
+        save(); showSummary(); notify('已导入内部决策，可继续修改或重新导出。');
+      } catch (err) {
+        notify(err instanceof SyntaxError ? '无法解析 JSON，请选择本页导出的决策文件。' : err.message);
+      }
+      $('import-file').value = '';
+    }
+
+    function applyAllRecommendations() {
+      let applied = 0;
+      let skipped = 0;
+      const now = new Date().toISOString();
+      for (const item of data.issues) {
+        const state = decisions[item.id];
+        if (state.decision || !item.recommendedAction) continue;
+        const choice = item.choices.find(c => c.value === item.recommendedAction);
+        if (!choice) continue;
+        if (choice.value === 'revise' || choice.requiresCorrection || choice.correctionField) { skipped++; continue; }
+        state.decision = choice.value;
+        state.updatedAt = now;
+        applied++;
+      }
+      if (showingSummary) showSummary(false); else showIssue(currentIndex, false);
+      notify(applied ? '已按系统建议预填 ' + applied + ' 组未决事项' + (skipped ? '（另有 ' + skipped + ' 组需填写参数，已跳过）' : '') + '。' : '没有可直接预填的未决推荐项。');
+    }
+
+    function notify(msg) {
+      clearTimeout(toastTimer); $('toast').textContent = msg; $('toast').hidden = false;
+      toastTimer = setTimeout(() => { $('toast').hidden = true; }, 8500);
+    }
+
+    document.title = '[内部审核] ' + (data.title || '内部待办决策页') + ' · ' + (data.projectId || '');
+    $('banner-meta').textContent = [data.projectId, '修订版 ' + data.revision, data.createdAt].filter(Boolean).join(' · ');
+    $('brandline').textContent = [data.company, data.projectId, data.createdAt].filter(Boolean).join(' · ');
+    $('page-title').textContent = data.title || '内部待办决策页';
+    if (data.instructions) $('instructions').textContent = data.instructions;
+    $('kpi-actionable').textContent = data.summary.actionableGroups + ' 组';
+    $('kpi-auto').textContent = data.summary.autoResolvedGroups + ' 组';
+    $('kpi-risk').textContent = data.summary.riskRetainedGroups + ' 组';
+    $('kpi-cus').textContent = data.summary.cusPendingGroups + ' 组';
+    $('kpi-cus-sub').textContent = '待汇总 ' + (data.cusSummary?.draftGroups || 0) + ' · 已发待答 ' + (data.cusSummary?.sentGroups || 0);
+    $('audit-evidence-total').textContent = '审计证据总数：' + data.summary.totalEvidenceCount + ' 条（页/词/图）';
+
+    restore();
+    buildFilters();
+    renderAuditDrawers();
+    showIssue(currentIndex);
+    if (!storageAvailable) $('save-state').textContent = '当前浏览器无法暂存，请及时导出 JSON';
+
+    $('kpi-auto-btn').addEventListener('click', () => { $('drawer-auto').open = true; $('drawer-auto').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    $('kpi-risk-btn').addEventListener('click', () => { $('drawer-risk').open = true; $('drawer-risk').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    $('kpi-cus-btn').addEventListener('click', () => { $('drawer-cus').open = true; $('drawer-cus').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    $('apply-all-rec').addEventListener('click', applyAllRecommendations);
+    $('only-undecided').addEventListener('change', ev => { onlyUndecided = ev.target.checked; renderNavList(); });
+    $('mobile-nav').addEventListener('change', ev => showIssue(data.issues.findIndex(item => item.id === ev.target.value), true));
+    $('summary-button').addEventListener('click', () => showSummary());
+    $('export-top').addEventListener('click', exportDecisions);
+    $('export-bottom').addEventListener('click', exportDecisions);
+    $('import-button').addEventListener('click', () => $('import-file').click());
+    $('import-file').addEventListener('change', ev => importDecisions(ev.target.files[0]));
+    $('previous').addEventListener('click', () => showIssue(currentIndex - 1, true));
+    $('next').addEventListener('click', () => {
+      const item = data.issues[currentIndex];
+      const err = decisionError(item, decisions[item.id]);
+      if (err) { $('answer-error').textContent = err; $('answer-error').hidden = false; return; }
+      if (currentIndex === data.issues.length - 1) showSummary(); else showIssue(currentIndex + 1, true);
+      save();
+    });
+    $('applicability').addEventListener('input', ev => { const s = decisions[data.issues[currentIndex].id]; s.applicability = ev.target.value; s.updatedAt = new Date().toISOString(); save(); });
+    $('note').addEventListener('input', ev => { const s = decisions[data.issues[currentIndex].id]; s.note = ev.target.value; s.updatedAt = new Date().toISOString(); save(); });
+    $('reviewer-name').addEventListener('input', ev => { reviewer.name = ev.target.value; save(); });
+    $('reviewer-team').addEventListener('input', ev => { reviewer.team = ev.target.value; save(); });
+    $('answer-form').addEventListener('submit', ev => ev.preventDefault());
+    $('image-close').addEventListener('click', () => $('image-dialog').close());
+    $('image-dialog').addEventListener('click', ev => { if (ev.target === $('image-dialog')) $('image-dialog').close(); });
+  </script>
+</body>
+</html>

@@ -1,13 +1,22 @@
 ---
 name: customer-confirmation-webpage
-description: Turn source-backed customer questions or enterprise knowledge-base CUS items into a standalone HTML review page for fact corrections, document and image usage permissions, or replacement materials. Include relevant evidence and downloadable JSON/CSV feedback. Do not use to decide the customer's answer, contact the customer, or update/publish the knowledge base.
+description: Turn source-backed customer questions (CUS) OR internal enterprise knowledge-base governance triage items (MAT/ANM/TERM/D/CUS) into a standalone, offline HTML decision webpage with embedded evidence and downloadable JSON/CSV feedback. Use `--mode customer` (default) for customer-facing confirmation pages (`交付客户/`) and `--mode internal` for internal-only MAT/ANM/CUS batch decision pages (`内部决策/`, never delivered to customers, exporting `governance-decisions.json` for `governance.py collect`). Do not use to decide answers on behalf of the customer or specialist, contact the customer, or update/publish the knowledge base.
 ---
 
-# Customer Confirmation Webpage
+# Customer & Internal Offline Review Webpage
 
-Create a source-grounded, offline HTML page. Put each decision on its own screen with the relevant evidence, a plain-language question and choices tailored to the decision.
+Create a source-grounded, offline single-file HTML decision page in one of two strictly isolated modes:
 
-Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file destinations, and what the customer and knowledge specialist each receive. Read [references/data-schema.md](references/data-schema.md) when preparing the question data JSON. The reusable standalone page is [assets/review-template.html](assets/review-template.html); build it with `scripts/build_review_page.py`.
+- **Customer mode (`--mode customer`, default)**: Put each approved customer decision on its own screen with relevant evidence, a plain-language question, and tailored choices; export `customer-feedback.v1` JSON and `客户确认表.csv`. Uses [assets/review-template.html](assets/review-template.html).
+- **Internal mode (`--mode internal`)**: Build an internal-only MAT / ANM / TERM / D / CUS governance decision page (`内部审核专用 · 严禁发给客户`) with dual counts (decision groups vs. audit evidence), collapsed `autoResolved` / `riskRetained` audit drawers, per-group member checkboxes (bulk accept + individual exclusions), recommended actions, and `governance-decisions.v1` JSON export for `governance.py collect`. Uses [assets/internal-review-template.html](assets/internal-review-template.html).
+
+Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file destinations, and what the customer and knowledge specialist each receive. Read [references/data-schema.md](references/data-schema.md) when preparing `questions.json` (`customer-review-input.v1`) or `internal-review.json` (`internal-review-input.v1`). Build either page with `scripts/build_review_page.py`.
+
+## Mode isolation (hard boundary)
+
+- Never mix customer and internal payloads: `build_review_page.py` refuses internal data (`mode: "internal"` / `internal-review-input.v1`) in `customer` mode and refuses customer data in `internal` mode.
+- Never write an internal review page into `交付客户/` (or `customer-delivery` / `to-customer`): `build_review_page.py --mode internal` rejects those output paths. Put internal pages in `内部决策/<项目名>-内部待办决策页.html` or the KB run directory (`04_知识库构建/governance-review.html`).
+- Keep internal review inputs, internal HTML pages, and `governance-decisions.json` strictly internal; only a verified `--mode customer` HTML in `交付客户/` may be sent to a customer.
 
 ## Work boundaries
 
@@ -31,15 +40,18 @@ Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file
 
 ## Build and verify
 
-Use `客户确认网页/<项目编号>-<项目名>/` relative to the current machine's `SEO-Runs` workspace root. Resolve the root from the workspace or the supplied root path, and reuse the same project folder for later revisions. Put the HTML in `交付客户/`, input JSON and evidence in `work/`, and build reports and archived revisions in `内部交接/`.
+Use `客户确认网页/<项目编号>-<项目名>/` relative to the current machine's `SEO-Runs` workspace root. Resolve the root from the workspace or the supplied root path, and reuse the same project folder for later revisions. Put customer HTML in `交付客户/`, internal governance HTML in `内部决策/` (or the KB run directory `04_知识库构建/governance-review.html`), input JSON and evidence in `work/`, and build reports and archived revisions in `内部交接/`.
 
-1. Assemble and review the approved questions, stable IDs, plain-language choices, relevant original values, source locations, required correction fields, and annotated evidence. Use `references/data-schema.md` for the JSON shape.
-2. Build the standalone page:
+### Customer mode (`--mode customer`, default)
+
+1. Assemble and review the approved questions, stable IDs, plain-language choices, relevant original values, source locations, required correction fields, and annotated evidence. Use `references/data-schema.md` (`customer-review-input.v1`).
+2. Build the standalone customer page:
 
    ```powershell
    # Run from the current machine's SEO-Runs workspace root.
    $reviewRun = Join-Path '.' '客户确认网页/<项目编号>-<项目名>'
    python "<skill-root>\scripts\build_review_page.py" `
+     --mode customer `
      --data "$reviewRun\work\questions.json" `
      --output "$reviewRun\交付客户\<项目名>-客户确认页.html" `
      --report "$reviewRun\内部交接\build-report.json"
@@ -48,3 +60,25 @@ Use `客户确认网页/<项目编号>-<项目名>/` relative to the current mac
 3. Open the generated HTML in a local browser and verify all questions, website excerpts or screenshots, highlighted values, response fields, JSON export/import, CSV headers, and desktop/mobile layout. Do not rely on a successful build alone.
 4. Keep customer files separate from internal review materials. Send only the HTML page plus the short message in [README.md](README.md); keep question data, evidence audit, source copies, and test reports internal.
 5. When feedback returns, preserve the received file unchanged and return it with the exact HTML revision and any customer-supplied replacement documents to the knowledge specialist. Do not mark the CUS item resolved just because a file arrived.
+
+### Internal mode (`--mode internal`)
+
+Use when the knowledge specialist wants an offline HTML page to review grouped MAT / ANM / TERM / D / CUS internal decisions (for example, grouped dimension-drawing model confirmations, candidate term batches, table-diff verification, or deciding which items to retain as risk vs. escalate to CUS).
+
+1. Prepare `work/internal-review.json` following `internal-review-input.v1` in [references/data-schema.md](references/data-schema.md):
+   - Group evidence by root cause (`issues[]`), keeping `actionableGroups` small while putting individual terms, pages, or drawings into `members[]` (with optional thumbnails via `imagePath`) so the specialist can accept a group and uncheck exceptions.
+   - Put rule-closed items in `autoResolved[]` and risk-retained items (which keep ⚠ without remaining todo work) in `riskRetained[]`; keep both collapsed by default so the top KPI bar clearly separates actionable decision groups from audit evidence counts.
+   - Include `recommendedAction`, `recommendedReason`, `impactSummary`, `vaultLinks`, and `targetStatus` where available. Only offer bulk acceptance within the same rule/root cause.
+2. Build the standalone internal page (never inside `交付客户/`):
+
+   ```powershell
+   $reviewRun = Join-Path '.' '客户确认网页/<项目编号>-<项目名>'
+   python "<skill-root>\scripts\build_review_page.py" `
+     --mode internal `
+     --data "$reviewRun\work\internal-review.json" `
+     --output "$reviewRun\内部决策\<项目名>-内部待办决策页.html" `
+     --report "$reviewRun\内部交接\internal-build-report.json"
+   ```
+
+3. Open the generated HTML in a local browser and verify the red/amber `内部审核专用 · 严禁发给客户` banner, KPI dual counts, ledger filters, member checkboxes and image zoom, audit drawers, and `governance-decisions.json` export/import.
+4. Hand the exported `governance-decisions.json` back to `compile-enterprise-knowledge` (`governance.py collect`) to validate, apply, and rerun affected stages; do not modify the vault directly from this skill.

@@ -1,4 +1,4 @@
 interface:
-  display_name: "客户反馈网页生成"
-  short_description: "Offline customer review pages with evidence and feedback export"
-  default_prompt: "Use $customer-confirmation-webpage to build a customer review page from these approved questions and source files."
+  display_name: "离线决策网页生成（客户确认 / 内部待办）"
+  short_description: "Offline standalone HTML review pages for customer CUS confirmation and internal MAT/ANM/CUS governance triage"
+  default_prompt: "Use $customer-confirmation-webpage to build an offline standalone HTML review page (--mode customer for approved customer questions, or --mode internal for MAT/ANM/CUS internal governance triage)."

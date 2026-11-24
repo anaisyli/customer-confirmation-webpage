@@ -115,3 +115,88 @@ The JSON export contains:
 - the exact question, source filename, and source location for traceability.
 
 The CSV export contains one row per issue, including unanswered items with an empty answer. Keep the file's CUS IDs and header row intact; blank rows are intentionally ignored when the knowledge-base workflow reads answers.
+
+---
+
+# Internal governance review format (`--mode internal`)
+
+Use `--mode internal` for **internal-only** MAT / ANM / TERM / D / CUS triage pages. Internal review pages are strictly isolated from customer delivery: `build_review_page.py` refuses to build internal payloads in `customer` mode, refuses to write internal HTML into `交付客户/` (or `customer-delivery` / `to-customer`), embeds a top warning banner (`内部审核专用 · 严禁发给客户`), and exports `governance-decisions.v1` JSON instead of customer CSV.
+
+## Internal root object
+
+| Field | Required | Meaning |
+|---|---|---|
+| `schema` | yes (or `mode: "internal"`) | `internal-review-input.v1` (at least one of `schema: "internal-review-input.v1"` or `mode: "internal"` is required to prevent customer JSON from being built in internal mode) |
+| `mode` | optional (or `schema`) | `internal` (rejects `customer`, `customer-review-input.v1`, or root `csv`) |
+| `projectId` | yes | Stable project ID (e.g. `P-010`) |
+| `revision` | yes | Unique review revision (e.g. `20261124-1`) |
+| `company` | optional | Company name |
+| `createdAt` | optional | Date string (`YYYY-MM-DD`) |
+| `title` | optional | Page title; defaults to `内部待办决策页` |
+| `instructions` | optional | Short instruction line shown under KPI cards |
+| `exportPrefix` | optional | Export filename prefix; defaults to `projectId` |
+| `summary` | optional | Dual-count KPI overrides: `{actionableGroups?, autoResolvedGroups?, riskRetainedGroups?, cusPendingGroups?, totalEvidenceCount?}`. Auto-computed if omitted. |
+| `issues` | yes (may be empty if `autoResolved` or `riskRetained` is non-empty) | Ordered list of actionable internal decision groups |
+| `autoResolved` | optional | Collapsed audit records closed by versioned rules: `[{id, title, ledger?, category?, ruleVersion?, evidenceCount?, reason?, members?}]` |
+| `riskRetained` | optional | Collapsed risk-retained records (still carry ⚠, excluded from todo count): `[{id, ledger?, title, category?, evidenceCount?, reason?, riskNote?, vaultLinks?, members?}]` |
+| `cusSummary` | optional | Overview of CUS batch status: `{draftGroups?, sentGroups?, totalGroups?, items?: [{id, title, status?, batchId?, kind?, evidenceCount?}]}` |
+
+## Internal `issues[]` entry (one decision group)
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | Stable group ID (e.g. `P-010-MAT-007-G1`, `P-010-ANM-001`) |
+| `rootKey` | optional | Stable root-cause key carried straight into `governance-decisions.json`; defaults to `id` |
+| `ledger` | optional | `MAT`, `ANM`, `CUS`, `TERM`, `D`, or `OTHER` (defaults to `ANM`) |
+| `category` | optional | Short category label (e.g. `词项审核`, `尺寸图型号`, `表格精校`, `D类文件`) |
+| `product` / `scope` | optional | Scope or product line label |
+| `title` | yes | Short group summary |
+| `question` | yes | What internal decision is needed and why |
+| `evidenceCount` | optional | Total evidence items covered by this group (pages/terms/drawings); defaults to `members.length` or `evidence.length` |
+| `recommendedAction` | optional | Choice `value` recommended by rules/Agent (must match a choice in `choices[]`) |
+| `recommendedReason` | optional | Why the system recommends that action |
+| `impactSummary` | optional | Human-readable impact summary (e.g. `影响 142 个文本块，涉及 18 份资料`) |
+| `ruleVersion` | optional | Rule/dictionary version string |
+| `owner` | optional | Internal owner (e.g. `知识库专员`) |
+| `internalNote` | optional | Internal review context (rendered in internal mode only; forbidden in customer mode) |
+| `sourceName` / `sourceLocation` / `sourcePath` | optional | Internal source reference (vault or package paths allowed in internal mode) |
+| `vaultLinks` | optional | Array of `{label, path}` (or plain path strings) referencing vault notes |
+| `originalValues` | optional | Array of `[label, value]` pairs |
+| `members` | optional | Group evidence items supporting bulk select + per-item exclusion: `[{memberId, label, detail?, sourceName?, location?, imagePath?, selected?: true, meta?: [[k, v]]}]`. `imagePath` is embedded as Base64 and zoomable. |
+| `evidence` | optional | Representative images/excerpts/URLs (`{caption, imagePath?, excerpt?, highlights?, sourceUrl?, sourceName?, location?, capturedAt?}`). Each issue must provide at least one of `evidence`, `members`, or `originalValues`. |
+| `fields` | optional | Additional fields `{key, label, placeholder?}` (e.g. confirmed model name or customer-facing CUS question) |
+| `choices` | yes | Array `{value, label, detail, targetStatus?, requiresCorrection?, correctionField?}` |
+
+## Internal decisions export (`governance-decisions.v1`)
+
+Exported from the internal HTML page for `governance.py collect` (and re-importable into the same HTML revision):
+
+```json
+{
+  "schema": "governance-decisions.v1",
+  "mode": "internal",
+  "projectId": "P-010",
+  "reviewRevision": "20261124-1",
+  "exportedAt": "2026-11-24T03:00:00.000Z",
+  "reviewer": {"name": "知识库专员", "team": "知识库治理"},
+  "summary": {"totalGroups": 3, "decidedGroups": 3, "undecidedGroups": 0},
+  "decisions": [
+    {
+      "id": "P-010-MAT-007-G1",
+      "rootKey": "dimension_drawing_model:neighbor_title",
+      "ledger": "MAT",
+      "category": "尺寸图型号",
+      "decision": "confirm_model",
+      "decisionLabel": "按相邻规格标题批量确认型号",
+      "targetStatus": "closed",
+      "ruleVersion": "v1",
+      "selectedMembers": ["item-01|page 3", "item-02|page 5"],
+      "excludedMembers": ["item-03|page 8"],
+      "values": {},
+      "applicability": "",
+      "note": "第 8 页为通用框架图，排除后单独保留待确认",
+      "updatedAt": "2026-11-24T02:58:00.000Z"
+    }
+  ]
+}
+```
