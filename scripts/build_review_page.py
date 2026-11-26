@@ -22,6 +22,25 @@ ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 ALLOWED_MODES = ("customer", "internal")
 ALLOWED_INTERNAL_LEDGERS = {"MAT", "ANM", "CUS", "TERM", "D", "OTHER"}
 FORBIDDEN_INTERNAL_OUTPUT_DIRS = {"交付客户", "customer-delivery", "to-customer", "deliver-to-customer"}
+CUS_STATUS_LABELS = {
+    "draft": "待汇总",
+    "exported": "已导出待发",
+    "sent": "已发待答",
+    "answered": "已答待核验",
+    "closed": "已关闭",
+}
+
+
+def collect_answer_ids(data: dict) -> list[str]:
+    """Return every customer answerId covered by this payload (primary + linkedAnswers) in order."""
+    ids: list[str] = []
+    for item in data.get("issues", []):
+        if item.get("answerId"):
+            ids.append(item["answerId"])
+        for linked in item.get("linkedAnswers", []):
+            if linked.get("answerId"):
+                ids.append(linked["answerId"])
+    return ids
 
 
 def parser() -> argparse.ArgumentParser:
@@ -88,6 +107,23 @@ def load_data(path: Path) -> dict:
                     raise ValueError(f"{where}.sourcePath must stay relative to the screening package")
         if "cusId" in item:
             item["cusId"] = require_string(item["cusId"], "cusId", where)
+        for opt_field in ("purpose", "expectedAnswer", "proposedText"):
+            if opt_field in item and item[opt_field] is not None:
+                val = optional_string(item[opt_field], opt_field, where)
+                if val:
+                    item[opt_field] = val
+                else:
+                    item.pop(opt_field, None)
+        if "listGroup" in item and item["listGroup"] is not None:
+            grp = item["listGroup"]
+            if not isinstance(grp, dict):
+                raise ValueError(f"{where}.listGroup must be an object")
+            item["listGroup"] = {
+                "id": require_string(grp.get("id"), "listGroup.id", where),
+                "title": require_string(grp.get("title"), "listGroup.title", where),
+                **({"description": optional_string(grp.get("description"), "listGroup.description", where)}
+                   if grp.get("description") is not None else {}),
+            }
         kind = item.get("kind", "fact")
         if kind not in ("fact", "usage", "replacement"):
             raise ValueError(f"{where}.kind must be fact, usage, or replacement")
@@ -363,6 +399,9 @@ def sanitize_public_data(data: dict) -> dict:
         }
         if item.get("sourcePath"):
             entry["sourcePath"] = item["sourcePath"]
+        for opt_field in ("purpose", "expectedAnswer", "proposedText", "listGroup"):
+            if item.get(opt_field):
+                entry[opt_field] = item[opt_field]
         public["issues"].append(entry)
     return public
 
@@ -490,7 +529,7 @@ def load_internal_data(path: Path) -> dict:
     data["riskRetained"] = risk_retained
 
     raw_cus = data.get("cusSummary")
-    cus_summary: dict = {"draftGroups": 0, "sentGroups": 0, "totalGroups": 0, "items": []}
+    cus_summary: dict = {"draftGroups": 0, "exportedGroups": 0, "sentGroups": 0, "totalGroups": 0, "items": []}
     if raw_cus is not None:
         if not isinstance(raw_cus, dict):
             raise ValueError("root.cusSummary must be an object")
@@ -502,26 +541,32 @@ def load_internal_data(path: Path) -> dict:
             where = f"cusSummary.items[{idx}]"
             if not isinstance(entry, dict):
                 raise ValueError(f"{where} must be an object")
+            raw_status = optional_string(entry.get("status"), "status", where, default="待汇总")
+            norm_status = CUS_STATUS_LABELS.get(raw_status.casefold(), raw_status)
             item_out: dict = {
                 "id": require_string(entry.get("id"), "id", where),
                 "title": require_string(entry.get("title"), "title", where),
-                "status": optional_string(entry.get("status"), "status", where, default="待汇总"),
+                "status": norm_status,
                 "batchId": optional_string(entry.get("batchId"), "batchId", where),
                 "kind": optional_string(entry.get("kind"), "kind", where),
                 "evidenceCount": optional_non_negative_int(entry.get("evidenceCount"), "evidenceCount", where) or 1,
             }
             items_out.append(item_out)
         draft_groups = optional_non_negative_int(raw_cus.get("draftGroups"), "draftGroups", "cusSummary")
+        exported_groups = optional_non_negative_int(raw_cus.get("exportedGroups"), "exportedGroups", "cusSummary")
         sent_groups = optional_non_negative_int(raw_cus.get("sentGroups"), "sentGroups", "cusSummary")
         total_groups = optional_non_negative_int(raw_cus.get("totalGroups"), "totalGroups", "cusSummary")
         if draft_groups is None:
-            draft_groups = sum(1 for entry in items_out if entry["status"] in {"待汇总", "draft"})
+            draft_groups = sum(1 for entry in items_out if entry["status"] == "待汇总")
+        if exported_groups is None:
+            exported_groups = sum(1 for entry in items_out if entry["status"] == "已导出待发")
         if sent_groups is None:
-            sent_groups = sum(1 for entry in items_out if entry["status"] in {"已发待答", "sent"})
+            sent_groups = sum(1 for entry in items_out if entry["status"] == "已发待答")
         if total_groups is None:
-            total_groups = len(items_out) if items_out else (draft_groups + sent_groups)
+            total_groups = len(items_out) if items_out else (draft_groups + exported_groups + sent_groups)
         cus_summary = {
             "draftGroups": draft_groups,
+            "exportedGroups": exported_groups,
             "sentGroups": sent_groups,
             "totalGroups": total_groups,
             "items": items_out,
@@ -643,6 +688,9 @@ def load_internal_data(path: Path) -> dict:
                 "detail": optional_string(member.get("detail"), "detail", m_where),
                 "sourceName": optional_string(member.get("sourceName"), "sourceName", m_where),
                 "location": optional_string(member.get("location"), "location", m_where),
+                "removedText": optional_string(member.get("removedText"), "removedText", m_where),
+                "restoreBenefit": optional_string(member.get("restoreBenefit"), "restoreBenefit", m_where),
+                "suggestion": optional_string(member.get("suggestion"), "suggestion", m_where),
                 "selected": selected,
             }
             if "imagePath" in member and member["imagePath"] is not None:
@@ -815,6 +863,9 @@ def sanitize_internal_data(data: dict) -> dict:
                     **({"detail": m["detail"]} if m.get("detail") else {}),
                     **({"sourceName": m["sourceName"]} if m.get("sourceName") else {}),
                     **({"location": m["location"]} if m.get("location") else {}),
+                    **({"removedText": m["removedText"]} if m.get("removedText") else {}),
+                    **({"restoreBenefit": m["restoreBenefit"]} if m.get("restoreBenefit") else {}),
+                    **({"suggestion": m["suggestion"]} if m.get("suggestion") else {}),
                     "selected": m["selected"],
                     **({"meta": m["meta"]} if m.get("meta") else {}),
                     **({"image": m["image"]} if "image" in m else {}),
@@ -882,6 +933,12 @@ def main() -> int:
                     "autoResolvedCount": len(data["autoResolved"]),
                     "riskRetainedCount": len(data["riskRetained"]),
                     "summary": data["summary"],
+                })
+            else:
+                all_answer_ids = collect_answer_ids(data)
+                report_payload.update({
+                    "answerCount": len(all_answer_ids),
+                    "answerIds": all_answer_ids,
                 })
             report_path.write_text(json.dumps(report_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"mode": mode, "output": str(output), "issues": len(data["issues"]),

@@ -104,6 +104,22 @@
     .issue-counter { color:var(--muted); font-size:13px; }
     .pager { display:flex; gap:9px; }
     .reference { margin:12px 3px 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .meta-line { margin:8px 0 0; font-size:13px; color:var(--muted); }
+    .proposed-box { margin:12px 0 0; padding:12px 14px; background:#eff6ff; border-left:4px solid var(--green); border-radius:8px; font-size:15px; line-height:1.65; }
+    .proposed-box strong { display:block; font-size:12px; color:var(--green); margin-bottom:4px; }
+    .group-view { padding:20px 24px; }
+    .group-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px 14px; background:#f7faf9; border:1px solid var(--line); border-radius:10px; margin-bottom:14px; }
+    .group-toolbar select, .group-toolbar input { padding:7px 10px; border:1px solid #b9caca; border-radius:8px; font:inherit; font-size:13px; background:#fff; }
+    .group-row { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:#fff; }
+    .group-row-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; align-items:flex-start; }
+    .group-row-title { font-weight:600; font-size:14px; }
+    .group-row-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+    .group-row-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+    .group-row-controls select, .group-row-controls input { padding:6px 10px; border:1px solid #b9caca; border-radius:8px; font:inherit; font-size:13px; background:#fff; }
+    .group-row-controls input { flex:1 1 200px; }
+    .group-row details { margin-top:8px; font-size:13px; color:var(--muted); }
+    .group-more { margin-top:12px; }
+    .group-more > summary { cursor:pointer; font-weight:600; color:var(--green); padding:8px 0; }
     .summary-view { background:#fff; border:1px solid var(--line); border-radius:12px; padding:26px; }
     .summary-view h2 { margin-bottom:6px; }
     .reviewer-fields { display:grid; grid-template-columns:1fr 1fr; gap:15px; max-width:650px; margin:20px 0 10px; }
@@ -158,19 +174,16 @@
           <p class="eyebrow" id="product"></p>
           <h2 id="issue-title" tabindex="-1"></h2>
           <p class="question" id="question"></p>
+          <p class="meta-line" id="purpose-line" hidden></p>
+          <div class="proposed-box" id="proposed-box" hidden><strong>拟用对外说法</strong><span id="proposed-text"></span></div>
         </div>
-        <div class="issue-body">
-          <section class="evidence" aria-label="原件内容">
-            <p class="section-label" id="evidence-title">原件中的写法</p>
-            <table class="values" id="values-table" aria-labelledby="evidence-title"><tbody id="original-values"></tbody></table>
-            <dl class="source-meta" id="source-meta" aria-label="来源信息"></dl>
-            <div id="evidence-content">
-              <p class="figure-hint" id="evidence-hint">重点已用黄色标出。</p>
-              <div id="evidence-images"></div>
-            </div>
-            <details class="file-preview" id="file-preview" hidden><summary>查看原件片段</summary></details>
-          </section>
+        <div class="group-view" id="group-view" hidden>
+          <div class="group-toolbar" id="group-toolbar"></div>
+          <div id="group-rows"></div>
+        </div>
+        <div class="issue-body" id="single-body">
           <form id="answer-form" class="answers" novalidate>
+            <table class="values" id="values-table" aria-labelledby="evidence-title"><tbody id="original-values"></tbody></table>
             <fieldset><legend class="section-label">请选择处理方式</legend><div id="choices" class="choices"></div></fieldset>
             <div class="corrections" id="corrections" hidden>
               <p class="section-label">请填写确认后的内容</p><div id="correction-fields"></div>
@@ -183,6 +196,16 @@
             </details>
             <p class="error" id="answer-error" role="alert" hidden></p>
           </form>
+          <section class="evidence" aria-label="原件内容">
+            <p class="section-label" id="evidence-title">原件证据（按需展开）</p>
+            <details class="file-preview" id="file-preview"><summary>查看原件证据</summary>
+              <dl class="source-meta" id="source-meta" aria-label="来源信息"></dl>
+              <div id="evidence-content">
+                <p class="figure-hint" id="evidence-hint">重点已用黄色标出。</p>
+                <div id="evidence-images"></div>
+              </div>
+            </details>
+          </section>
         </div>
         <div class="issue-footer">
           <span id="issue-counter" class="issue-counter"></span>
@@ -223,9 +246,28 @@
     let answers = Object.fromEntries(data.issues.map(item => [item.id, freshAnswer()]));
     let reviewer = { name:'', team:'' };
     let currentIndex = 0;
+    let currentScreen = 0;
     let showingSummary = false;
     let storageAvailable = true;
     let toastTimer;
+
+    // Build navigation screens: issues sharing the same listGroup.id render as one grouped checklist screen.
+    const screens = [];
+    const groupMap = new Map();
+    for (const item of data.issues) {
+      if (item.listGroup && item.listGroup.id) {
+        let screen = groupMap.get(item.listGroup.id);
+        if (!screen) {
+          screen = { type:'group', id:'group:' + item.listGroup.id, title:item.listGroup.title, description:item.listGroup.description || '', items:[] };
+          groupMap.set(item.listGroup.id, screen);
+          screens.push(screen);
+        }
+        screen.items.push(item);
+      } else {
+        screens.push({ type:'single', id:item.id, title:item.title, product:item.product, item });
+      }
+    }
+    const screenIndexOfIssue = id => screens.findIndex(s => s.type === 'single' ? s.item.id === id : s.items.some(i => i.id === id));
 
     function textElement(tag, text, className) {
       const element = document.createElement(tag);
@@ -307,34 +349,190 @@
       $('progress').max = data.issues.length;
       $('progress').value = count;
       for (const button of $('navlist').children) {
-        const item = byId.get(button.dataset.id);
+        const sIdx = Number(button.dataset.screenIndex);
+        const scr = screens[sIdx];
         const mark = button.querySelector('.mark');
-        mark.textContent = isComplete(item) ? '✓' : '';
-        button.setAttribute('aria-current', !showingSummary && item.id === data.issues[currentIndex].id ? 'step' : 'false');
+        if (scr.type === 'group') {
+          const done = scr.items.filter(isComplete).length;
+          mark.textContent = done === scr.items.length ? '✓' : (done + '/' + scr.items.length);
+        } else {
+          mark.textContent = isComplete(scr.item) ? '✓' : '';
+        }
+        button.setAttribute('aria-current', !showingSummary && sIdx === currentScreen ? 'step' : 'false');
       }
       for (const option of $('mobile-nav').options) {
-        const item = byId.get(option.value);
-        option.textContent = (isComplete(item) ? '✓ ' : '') + (data.issues.indexOf(item) + 1) + '. ' + item.title + ' · ' + item.product;
+        const sIdx = Number(option.dataset.screenIndex);
+        const scr = screens[sIdx];
+        if (scr.type === 'group') {
+          const done = scr.items.filter(isComplete).length;
+          option.textContent = (done === scr.items.length ? '✓ ' : '') + (sIdx + 1) + '. ' + scr.title + '（' + done + '/' + scr.items.length + '）';
+        } else {
+          option.textContent = (isComplete(scr.item) ? '✓ ' : '') + (sIdx + 1) + '. ' + scr.item.title + ' · ' + scr.item.product;
+        }
       }
     }
 
     function buildNavigation() {
-      for (const [index, item] of data.issues.entries()) {
+      for (const [sIdx, scr] of screens.entries()) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'navitem';
-        button.dataset.id = item.id;
-        button.append(textElement('span', String(index + 1).padStart(2, '0'), 'num'));
-        const label = textElement('span', item.title);
-        label.append(textElement('small', item.product, 'nav-source'));
+        button.dataset.id = scr.id;
+        button.dataset.screenIndex = String(sIdx);
+        button.append(textElement('span', String(sIdx + 1).padStart(2, '0'), 'num'));
+        const label = textElement('span', scr.title);
+        label.append(textElement('small', scr.type === 'group' ? ('清单 · 共 ' + scr.items.length + ' 项') : scr.product, 'nav-source'));
         button.append(label);
         button.append(textElement('span', '', 'mark'));
-        button.addEventListener('click', () => showIssue(index, true));
+        button.addEventListener('click', () => showScreen(sIdx, true));
         $('navlist').append(button);
         const option = document.createElement('option');
-        option.value = item.id;
+        option.value = scr.id;
+        option.dataset.screenIndex = String(sIdx);
         $('mobile-nav').append(option);
       }
+    }
+
+    function showGroupScreen(sIdx, focus=false) {
+      currentScreen = sIdx;
+      showingSummary = false;
+      const scr = screens[sIdx];
+      currentIndex = data.issues.indexOf(scr.items[0]);
+      $('review-view').hidden = false;
+      $('reference').hidden = true;
+      $('summary-view').hidden = true;
+      $('single-body').hidden = true;
+      $('group-view').hidden = false;
+      $('product').textContent = '批量授权清单 · 共 ' + scr.items.length + ' 项';
+      $('issue-title').textContent = scr.title;
+      $('question').textContent = scr.description || '以下同类事项合并在一页展示：可先统一填写空白项，再逐条修改例外。每条均保留独立编号。';
+      $('purpose-line').hidden = true;
+      $('proposed-box').hidden = true;
+
+      const toolbar = $('group-toolbar');
+      toolbar.replaceChildren();
+      const firstChoices = scr.items[0].choices || [];
+      const bulkSelect = document.createElement('select');
+      bulkSelect.setAttribute('aria-label', '统一填写空白项选项');
+      bulkSelect.append(textElement('option', '选择要统一填给空白项的处理意见…'));
+      bulkSelect.options[0].value = '';
+      for (const ch of firstChoices) {
+        const opt = textElement('option', ch.label);
+        opt.value = ch.value;
+        bulkSelect.append(opt);
+      }
+      const bulkScope = document.createElement('input');
+      bulkScope.type = 'text';
+      bulkScope.placeholder = '统一说明/范围（选填，仅填给空白项）';
+      const bulkBtn = textElement('button', '统一填写空白项', 'btn');
+      bulkBtn.type = 'button';
+      bulkBtn.addEventListener('click', () => {
+        if (!bulkSelect.value) { notify('请先选择一个统一处理意见。'); return; }
+        let filled = 0;
+        const now = new Date().toISOString();
+        for (const item of scr.items) {
+          const ans = answers[item.id];
+          if (ans.decision) continue;
+          if (!item.choices.some(c => c.value === bulkSelect.value)) continue;
+          ans.decision = bulkSelect.value;
+          if (bulkScope.value.trim() && item.fields.length) ans.values[item.fields[0].key] = bulkScope.value.trim();
+          ans.updatedAt = now;
+          filled++;
+        }
+        save();
+        showGroupScreen(sIdx, false);
+        notify(filled ? ('已为空白项统一填写 ' + filled + ' 条，仍可逐条修改例外。') : '本清单已没有空白项。');
+      });
+      toolbar.append(textElement('strong', '批量操作：'), bulkSelect, bulkScope, bulkBtn);
+
+      const renderRow = (item, idx) => {
+        const ans = answers[item.id];
+        const card = document.createElement('div');
+        card.className = 'group-row';
+        const head = document.createElement('div');
+        head.className = 'group-row-head';
+        const left = document.createElement('div');
+        left.append(textElement('div', (idx + 1) + '. ' + item.title, 'group-row-title'));
+        left.append(textElement('div', [item.cusId || item.id, item.sourceName, item.sourceLocation].filter(Boolean).join(' · '), 'group-row-meta'));
+        head.append(left);
+        card.append(head);
+
+        const controls = document.createElement('div');
+        controls.className = 'group-row-controls';
+        const sel = document.createElement('select');
+        sel.setAttribute('aria-label', item.title);
+        const blank = textElement('option', '— 请选择 —'); blank.value = '';
+        sel.append(blank);
+        for (const ch of item.choices) {
+          const opt = textElement('option', ch.label); opt.value = ch.value;
+          sel.append(opt);
+        }
+        sel.value = ans.decision;
+        const scopeInput = document.createElement('input');
+        scopeInput.type = 'text';
+        const firstField = item.fields[0];
+        scopeInput.placeholder = firstField ? firstField.placeholder || firstField.label : '补充说明（选填）';
+        scopeInput.value = firstField ? (ans.values[firstField.key] || '') : ans.note;
+        const toggleScope = () => {
+          const need = needsCorrection(item, ans);
+          scopeInput.hidden = !need && !scopeInput.value;
+        };
+        sel.addEventListener('change', () => {
+          ans.decision = sel.value;
+          ans.updatedAt = new Date().toISOString();
+          toggleScope();
+          save();
+        });
+        scopeInput.addEventListener('input', () => {
+          if (firstField) ans.values[firstField.key] = scopeInput.value;
+          else ans.note = scopeInput.value;
+          ans.updatedAt = new Date().toISOString();
+          save();
+        });
+        toggleScope();
+        controls.append(sel, scopeInput);
+        card.append(controls);
+
+        const det = document.createElement('details');
+        det.append(textElement('summary', '查看原件信息与摘录'));
+        if (item.sourcePath) det.append(textElement('p', '初筛包位置：' + item.sourcePath, 'group-row-meta'));
+        for (const ev of item.evidence || []) {
+          if (ev.sourceUrl) {
+            const a = textElement('a', ev.sourceUrl, 'source-url');
+            a.href = ev.sourceUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            det.append(a);
+          }
+          if (ev.excerpt) det.append(textElement('blockquote', ev.excerpt, 'web-excerpt'));
+        }
+        card.append(det);
+        return card;
+      };
+
+      const rowsEl = $('group-rows');
+      rowsEl.replaceChildren();
+      const INITIAL_LIMIT = 20;
+      scr.items.slice(0, INITIAL_LIMIT).forEach((item, idx) => rowsEl.append(renderRow(item, idx)));
+      if (scr.items.length > INITIAL_LIMIT) {
+        const more = document.createElement('details');
+        more.className = 'group-more';
+        more.append(textElement('summary', '展开其余 ' + (scr.items.length - INITIAL_LIMIT) + ' 项（长清单默认折叠）'));
+        scr.items.slice(INITIAL_LIMIT).forEach((item, idx) => more.append(renderRow(item, INITIAL_LIMIT + idx)));
+        rowsEl.append(more);
+      }
+
+      $('issue-counter').textContent = '第 ' + (currentScreen + 1) + ' 页 / 共 ' + screens.length + ' 页';
+      $('previous').disabled = currentScreen === 0;
+      $('next').textContent = currentScreen === screens.length - 1 ? '检查结果' : '下一页';
+      $('mobile-nav').value = scr.id;
+      save();
+      if (focus) { $('issue-title').focus({preventScroll:true}); $('review-view').scrollIntoView({behavior:'smooth',block:'start'}); }
+    }
+
+    function showScreen(sIdx, focus=false) {
+      const clamped = Math.max(0, Math.min(screens.length - 1, sIdx));
+      const scr = screens[clamped];
+      if (scr.type === 'group') showGroupScreen(clamped, focus);
+      else showIssue(data.issues.indexOf(scr.item), focus);
     }
 
     function updateCorrectionVisibility() {
@@ -348,17 +546,30 @@
 
     function showIssue(index, focus=false) {
       currentIndex = Math.max(0, Math.min(data.issues.length - 1, index));
-      showingSummary = false;
       const item = data.issues[currentIndex];
+      const mapped = screenIndexOfIssue(item.id);
+      if (mapped >= 0 && screens[mapped].type === 'group') {
+        showGroupScreen(mapped, focus);
+        return;
+      }
+      currentScreen = mapped >= 0 ? mapped : 0;
+      showingSummary = false;
       const answer = answers[item.id];
       $('review-view').hidden = false;
+      $('single-body').hidden = false;
+      $('group-view').hidden = true;
       $('reference').hidden = false;
       $('summary-view').hidden = true;
       $('product').textContent = item.product;
       $('issue-title').textContent = item.title;
       $('question').textContent = item.question;
+      const metaParts = [item.purpose ? ('用途：' + item.purpose) : '', item.expectedAnswer ? ('答法：' + item.expectedAnswer) : ''].filter(Boolean);
+      $('purpose-line').hidden = !metaParts.length;
+      $('purpose-line').textContent = metaParts.join(' · ');
+      $('proposed-box').hidden = !item.proposedText;
+      if (item.proposedText) $('proposed-text').textContent = item.proposedText;
       $('reference').textContent = '事项编号 ' + (item.cusId || item.id);
-      $('evidence-title').textContent = {usage:'待确认的资料', replacement:'需要补充的原件位置'}[item.kind] || '原件中的写法';
+      $('evidence-title').textContent = {usage:'原件资料（按需展开）', replacement:'需要补充的原件位置（按需展开）'}[item.kind] || '原件证据（按需展开）';
       $('values-table').hidden = !item.originalValues.length;
       $('original-values').replaceChildren();
       for (const [label, value] of item.originalValues) {
@@ -390,17 +601,14 @@
         item.evidence.length === 2 && item.evidence.every(evidence => evidence.sourceUrl));
       const hasImages = item.evidence.some(evidence => evidence.image);
       const hasExcerpts = item.evidence.some(evidence => evidence.excerpt);
-      const hasPreviewContent = hasImages || hasExcerpts;
       const hasHighlights = item.evidence.some(evidence =>
         (evidence.image && evidence.highlighted !== false) || evidence.highlights?.length);
       const filePreview = $('file-preview');
-      filePreview.hidden = !(wholeFile && hasPreviewContent);
+      filePreview.hidden = false;
       filePreview.open = false;
-      filePreview.querySelector('summary').textContent = hasImages && item.evidence.every(evidence => evidence.image && !evidence.excerpt)
-        ? '查看原件配图' : '查看原件片段';
-      if (wholeFile && hasPreviewContent) filePreview.append($('evidence-content'));
-      else filePreview.before($('evidence-content'));
-      $('evidence-content').hidden = wholeFile && !hasPreviewContent;
+      filePreview.querySelector('summary').textContent = hasImages
+        ? '查看原件截图与证据（点击展开）' : '查看原件来源与摘录（点击展开）';
+      $('evidence-content').hidden = !(hasImages || hasExcerpts || isWebsite);
       $('evidence-hint').textContent = [
         hasHighlights ? '重点已用黄色标出。' : '',
         hasImages ? '点击图片可放大查看。' : ''
@@ -493,10 +701,10 @@
       $('additional-details').open = Boolean(answer.note || answer.applicability || answer.decision === 'pending');
       $('answer-error').hidden = true;
       updateCorrectionVisibility();
-      $('issue-counter').textContent = '第 ' + (currentIndex + 1) + ' 项 / 共 ' + data.issues.length + ' 项';
-      $('previous').disabled = currentIndex === 0;
-      $('next').textContent = currentIndex === data.issues.length - 1 ? '检查结果' : '下一项';
-      $('mobile-nav').value = item.id;
+      $('issue-counter').textContent = '第 ' + (currentScreen + 1) + ' 页 / 共 ' + screens.length + ' 页';
+      $('previous').disabled = currentScreen === 0;
+      $('next').textContent = currentScreen === screens.length - 1 ? '检查结果' : '下一页';
+      $('mobile-nav').value = screens[currentScreen].id;
       save();
       if (focus) { $('issue-title').focus({preventScroll:true}); $('review-view').scrollIntoView({behavior:'smooth',block:'start'}); }
     }
@@ -669,20 +877,26 @@
     $('brandline').textContent = [data.company, data.projectId, data.createdAt].filter(Boolean).join(' · ');
     document.querySelector('h1').textContent = data.title || '客户资料确认';
     if (data.instructions) $('instructions').textContent = data.instructions;
-    restore(); buildNavigation(); showIssue(currentIndex);
+    restore(); buildNavigation(); showScreen(0);
     if (!storageAvailable) $('save-state').textContent = '此浏览器无法暂存，请及时导出反馈';
-    $('mobile-nav').addEventListener('change', event => showIssue(data.issues.findIndex(item => item.id === event.target.value), true));
+    $('mobile-nav').addEventListener('change', event => {
+      const sIdx = screens.findIndex(s => s.id === event.target.value);
+      if (sIdx >= 0) showScreen(sIdx, true);
+    });
     $('summary-button').addEventListener('click', () => showSummary());
     $('export-top').addEventListener('click', () => exportFeedback());
     $('export-bottom').addEventListener('click', () => exportFeedback());
     $('export-csv').addEventListener('click', () => exportFeedback('csv'));
     $('import-button').addEventListener('click', () => $('import-file').click());
     $('import-file').addEventListener('change', event => importFeedback(event.target.files[0]));
-    $('previous').addEventListener('click', () => showIssue(currentIndex - 1, true));
+    $('previous').addEventListener('click', () => showScreen(currentScreen - 1, true));
     $('next').addEventListener('click', () => {
-      const item = data.issues[currentIndex]; const error = answerError(item, answers[item.id]);
-      if (error) { $('answer-error').textContent = error; $('answer-error').hidden = false; return; }
-      if (currentIndex === data.issues.length - 1) showSummary(); else showIssue(currentIndex + 1, true);
+      const scr = screens[currentScreen];
+      if (scr.type === 'single') {
+        const item = scr.item; const error = answerError(item, answers[item.id]);
+        if (error) { $('answer-error').textContent = error; $('answer-error').hidden = false; return; }
+      }
+      if (currentScreen === screens.length - 1) showSummary(); else showScreen(currentScreen + 1, true);
       save();
     });
     $('applicability').addEventListener('input', event => { const answer = answers[data.issues[currentIndex].id]; answer.applicability = event.target.value; answer.updatedAt = new Date().toISOString(); save(); });

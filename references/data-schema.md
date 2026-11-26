@@ -37,6 +37,10 @@ Each `issues[]` entry contains:
 | `fields` | yes | Array of correction fields `{key, label, placeholder?}`; may be empty if no correction is needed |
 | `choices` | yes | Array `{value, label, detail, requiresCorrection?}` tailored to this issue. Optional `csvAnswer` overrides the answer cell only for that choice and accepts `保留`, `不用` or an empty string. JSON retains the full reply. |
 | `evidence` | yes | For a file, use `{caption, imagePath}` or `{caption, sourceName, location, excerpt}` with a verbatim extract. For a webpage, add `sourceUrl`, `sourceName`, `location`, `capturedAt` and a screenshot or extract. A usage card may use `{caption, sourceName, location}` when verified identification is sufficient. Set `highlighted: false` on an unmarked image and use `highlights` for literal fragments of an excerpt. |
+| `purpose` | optional | One-line explanation of where/why the confirmed answer will be used (e.g. `用于官网产品介绍页`) |
+| `expectedAnswer` | optional | One-line hint of what kind of reply is needed from the customer |
+| `proposedText` | optional | Suggested public wording to confirm on the first screen (e.g. qualification/certificate phrasing) |
+| `listGroup` | optional | `{id, title, description?}`. Issues sharing the same `listGroup.id` (e.g. website cases, documents, videos, images) render on ONE grouped checklist page with a「统一填写空白项」control while keeping every individual `id` / `answerId` separate in JSON & CSV exports (distinct from `linkedAnswers` shared answers). |
 | `priorReviewRequired` | optional | Internal note only; stripped by `build_review_page.py` and never embedded in the customer HTML |
 
 If a choice needs the customer to provide at least one correction field before the answer counts as complete, set `requiresCorrection: true`. The generic `revise` choice also requires a correction value. Do not set it for a choice such as “choose the Chinese version” when the chosen value is already explicit.
@@ -162,7 +166,7 @@ Use `--mode internal` for **internal-only** MAT / ANM / TERM / D / CUS triage pa
 | `sourceName` / `sourceLocation` / `sourcePath` | optional | Internal source reference (vault or package paths allowed in internal mode) |
 | `vaultLinks` | optional | Array of `{label, path}` (or plain path strings) referencing vault notes |
 | `originalValues` | optional | Array of `[label, value]` pairs |
-| `members` | optional | Group evidence items supporting bulk select + per-item exclusion: `[{memberId, label, detail?, sourceName?, location?, imagePath?, selected?: true, meta?: [[k, v]]}]`. `imagePath` is embedded as Base64 and zoomable. |
+| `members` | optional | Group evidence items supporting bulk select + per-item exclusion: `[{memberId, label, detail?, sourceName?, location?, removedText?, restoreBenefit?, suggestion?, imagePath?, selected?: true, meta?: [[k, v]]}]`. `removedText` / `restoreBenefit` / `suggestion` surface exact removed sentences and recommendations for cleanup triage. `imagePath` is embedded as Base64 and zoomable. |
 | `evidence` | optional | Representative images/excerpts/URLs (`{caption, imagePath?, excerpt?, highlights?, sourceUrl?, sourceName?, location?, capturedAt?}`). Each issue must provide at least one of `evidence`, `members`, or `originalValues`. |
 | `fields` | optional | Additional fields `{key, label, placeholder?}` (e.g. confirmed model name or customer-facing CUS question) |
 | `choices` | yes | Array `{value, label, detail, targetStatus?, requiresCorrection?, correctionField?}` |

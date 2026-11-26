@@ -581,8 +581,17 @@
           });
           const info = document.createElement('span');
           info.append(textEl('span', member.label, 'member-title'));
+          if (member.removedText) {
+            info.append(textEl('span', '被删原句：「' + member.removedText + '」', 'member-detail'));
+          }
           const sub = [member.sourceName, member.location, member.detail].filter(Boolean).join(' · ');
           if (sub) info.append(textEl('span', sub, 'member-detail'));
+          if (member.suggestion) {
+            info.append(textEl('span', '处理建议：' + member.suggestion, 'member-detail'));
+          }
+          if (member.restoreBenefit) {
+            info.append(textEl('span', '补回价值：' + member.restoreBenefit, 'member-detail'));
+          }
           if (member.meta && member.meta.length) {
             info.append(textEl('span', member.meta.map(([k, v]) => k + ': ' + v).join(' | '), 'member-detail mono'));
           }
@@ -1001,7 +1010,7 @@
       a.download = prefix + '-governance-decisions-' + stamp + '.json';
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
-      notify('已导出 ' + payload.summary.decidedGroups + ' / ' + payload.summary.totalGroups + ' 组内部决定，可交给 governance.py collect 校验应用。');
+      notify('已导出 ' + payload.summary.decidedGroups + ' / ' + payload.summary.totalGroups + ' 组内部决定，可交给 governance_state.py collect 校验应用。');
     }
 
     async function importDecisions(file) {
@@ -1059,7 +1068,7 @@
     $('kpi-auto').textContent = data.summary.autoResolvedGroups + ' 组';
     $('kpi-risk').textContent = data.summary.riskRetainedGroups + ' 组';
     $('kpi-cus').textContent = data.summary.cusPendingGroups + ' 组';
-    $('kpi-cus-sub').textContent = '待汇总 ' + (data.cusSummary?.draftGroups || 0) + ' · 已发待答 ' + (data.cusSummary?.sentGroups || 0);
+    $('kpi-cus-sub').textContent = '待汇总 ' + (data.cusSummary?.draftGroups || 0) + ' · 已导出待发 ' + (data.cusSummary?.exportedGroups || 0) + ' · 已发待答 ' + (data.cusSummary?.sentGroups || 0);
     $('audit-evidence-total').textContent = '审计证据总数：' + data.summary.totalEvidenceCount + ' 条（页/词/图）';
 
     restore();

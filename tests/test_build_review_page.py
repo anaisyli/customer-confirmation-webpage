@@ -418,6 +418,117 @@ class BuildReviewPageTests(unittest.TestCase):
             self.assertEqual(fail.returncode, 2)
             self.assertIn("recommendedAction", fail.stderr)
 
+    def test_grouped_checklist_proposed_text_coverage_and_internal_removal_evidence(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cus_json = root / "cus.json"
+            cus_json.write_text(json.dumps({
+                "schema": "customer-review-input.v1",
+                "projectId": "P-001",
+                "revision": "20261126-1",
+                "company": "甲公司",
+                "issues": [
+                    {
+                        "id": "P-001-CUS-001",
+                        "answerId": "P-001-CUS-001.1",
+                        "kind": "fact",
+                        "product": "资质认证",
+                        "title": "确认检测文件对外表述",
+                        "question": "我们计划在产品介绍中写以下表述，您看是否合适？",
+                        "purpose": "用于官网产品介绍页",
+                        "expectedAnswer": "请选择可用、提供修改说法或先不提",
+                        "proposedText": "这份检测文件所列的主测试型号为 PCX-SUV16。",
+                        "originalValues": [["检测文件", "主测试型号 PCX-SUV16"]],
+                        "sourceName": "检测报告.pdf",
+                        "sourceLocation": "第 1 页",
+                        "fields": [{"key": "correct_value", "label": "修改说法"}],
+                        "choices": [
+                            {"value": "confirm", "label": "可以用这句话", "detail": "按拟用说法发布"},
+                            {"value": "revise", "label": "请按我提供的说法写", "detail": "填写修改说法", "requiresCorrection": True},
+                            {"value": "exclude", "label": "这次先不提", "detail": "暂不引用"},
+                            {"value": "pending", "label": "稍后回复", "detail": "稍后答复"},
+                        ],
+                        "evidence": [{"caption": "检测报告 · 第 1 页", "sourceName": "检测报告.pdf", "location": "第 1 页", "excerpt": "主测试型号：PCX-SUV16"}],
+                    },
+                    *[
+                        {
+                            "id": f"P-001-CUS-002-{i}",
+                            "cusId": "P-001-CUS-002",
+                            "answerId": f"P-001-CUS-002.{i}",
+                            "kind": "usage",
+                            "product": "资料授权",
+                            "title": f"案例页 {i}",
+                            "question": f"案例页 {i} 能否公开使用？",
+                            "listGroup": {"id": "perm-cases", "title": "官网案例页授权清单", "description": "同类授权集中确认"},
+                            "originalValues": [],
+                            "sourceName": f"case-{i}.html",
+                            "sourceLocation": "整份文件",
+                            "fields": [{"key": "scope", "label": "范围"}],
+                            "choices": [
+                                {"value": "whole", "label": "可以公开使用", "detail": "整份可用", "csvAnswer": "保留"},
+                                {"value": "exclude", "label": "不使用", "detail": "整份排除", "csvAnswer": "不用"},
+                            ],
+                            "evidence": [{"caption": f"案例 {i}", "sourceName": f"case-{i}.html", "location": "整份文件"}],
+                        }
+                        for i in (1, 2, 3)
+                    ],
+                ],
+            }, ensure_ascii=False), encoding="utf-8")
+            out_cus = root / "交付客户" / "cus.html"
+            rep_cus = root / "内部交接" / "cus-report.json"
+            ok = subprocess.run([
+                sys.executable, str(BUILDER), "--mode", "customer",
+                "--data", str(cus_json), "--output", str(out_cus), "--report", str(rep_cus),
+            ], capture_output=True, text=True, check=False)
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            report = json.loads(rep_cus.read_text(encoding="utf-8"))
+            self.assertEqual(report["answerCount"], 4)
+            self.assertEqual(report["answerIds"], ["P-001-CUS-001.1", "P-001-CUS-002.1", "P-001-CUS-002.2", "P-001-CUS-002.3"])
+            html = out_cus.read_text(encoding="utf-8")
+            self.assertIn("PCX-SUV16", html)
+            self.assertIn("perm-cases", html)
+
+            # Internal mode: removal evidence + raw CUS status normalization (draft -> 待汇总, exported -> 已导出待发).
+            int_json = root / "int.json"
+            int_json.write_text(json.dumps({
+                "schema": "internal-review-input.v1",
+                "projectId": "P-001",
+                "revision": "20261126-1",
+                "cusSummary": {
+                    "items": [
+                        {"id": "P-001-CUS-001", "title": "资质表述", "status": "draft"},
+                        {"id": "P-001-CUS-002", "title": "案例授权", "status": "exported"},
+                    ]
+                },
+                "issues": [{
+                    "id": "P-001-MAT-001",
+                    "ledger": "MAT",
+                    "title": "规则删得多的资料",
+                    "question": "核对被删原句",
+                    "members": [{
+                        "memberId": "m1",
+                        "label": "产品画册",
+                        "sourceName": "产品画册",
+                        "location": "第 56 页",
+                        "removedText": "AGV 搬运和举升说明",
+                        "restoreBenefit": "补充 AGV 能力事实",
+                        "suggestion": "确认非敏感后补回",
+                    }],
+                    "choices": [{"value": "close", "label": "关闭", "detail": "确认关闭"}],
+                }],
+            }, ensure_ascii=False), encoding="utf-8")
+            out_int = root / "内部决策" / "int.html"
+            ok_int = subprocess.run([
+                sys.executable, str(BUILDER), "--mode", "internal",
+                "--data", str(int_json), "--output", str(out_int),
+            ], capture_output=True, text=True, check=False)
+            self.assertEqual(ok_int.returncode, 0, ok_int.stderr)
+            int_html = out_int.read_text(encoding="utf-8")
+            self.assertIn("AGV 搬运和举升说明", int_html)
+            self.assertIn("已导出待发", int_html)
+            self.assertIn('"draftGroups":1,"exportedGroups":1,"sentGroups":0', int_html)
+
 
 if __name__ == "__main__":
     unittest.main()
