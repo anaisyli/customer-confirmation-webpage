@@ -12,7 +12,7 @@
 | **解决什么** | CUS 事实核对、资料/图片公开授权、补交原件 | MAT / ANM / TERM / D / CUS 内部批量分流与决断（如尺寸图归属、词项放行、风险保留、决定哪些转 CUS） |
 | **输出位置** | `交付客户/<项目>-客户确认页.html` | `内部决策/<项目>-内部待办决策页.html`（脚本**禁止**写入 `交付客户/`） |
 | **导出文件** | 客户反馈 JSON + 兼容《客户确认表.csv》的 CSV | `governance-decisions.json`（`governance-decisions.v1`） |
-| **怎么回填** | 经办人回收 → 专员核验 → `apply_answers.py` | 专员校验预览 → `governance.py collect` → 增量重跑 |
+| **怎么回填** | 经办人回收 → 专员核验 → `apply_answers.py --dry-run` 预演后回填 | 专员校验预览 → `governance_state.py collect --dry-run` → 增量重跑 |
 | **安全红线** | 强行剥离内部备注和本地/知识库路径，只留初筛包相对路径 | 顶部固定警示 **「⚠ 内部审核专用 · 严禁发给客户」** |
 
 ---
@@ -83,7 +83,7 @@
 - **知识库专员收到反馈后**：
   1. 保留客户原始 JSON/CSV、对应 HTML 修订版与新附件，不覆盖原文件。
   2. 逐项核对编号、选项、填写值、单位、适用范围及新旧文件一致性；缺单位、矛盾或范围不清的保持待确认并退回澄清。
-  3. 对接 `compile-enterprise-knowledge` 时，仅将已核验答复写入匹配的 `04_知识库构建/客户确认表.csv` 回答列（保留原列头与编号）；自由文本和参数判断须人工审核，跑完 `apply_answers.py` 后检查 `client-notes.jsonl`、未识别项和配置差异，再重跑并按授权发布。
+  3. 对接 `compile-enterprise-knowledge` 时，可直接用 `apply_answers.py --answers <客户回传 JSON 或 CSV> --dry-run` 预演变更范围、未匹配旧编号与被拒资料的待清理缓存；自由文本和参数判断进 `client-notes.jsonl` 供人工审核，确认后再去掉 `--dry-run` 正式回填并按 `recommended_action` 刷新发布。
   4. 仅在明确事实有指定型号/配置答复支持时更新整理页并链接原证据；若客户仅确认“原件就是这么印的”但未确认数值本身正确，须保留风险标记。更新 CUS 处理记录。
 
 ---
@@ -99,7 +99,7 @@
         ↓ 专员在浏览器按组决策（支持组内勾选/排除个别项、放大尺寸图）
 导出 governance-decisions.json
         ↓ 交给 compile-enterprise-knowledge
-核对预览 → governance.py collect → 增量重跑（如 --from guard）→ verify_kb.py
+核对预览 → governance_state.py collect → 增量重跑（如 --from guard）→ verify_kb.py
 ```
 
 - **页面亮点**：首页顶部只按**待决事项组数**计待办，审计证据总数单列；已按规则自动结案（`autoResolved`）和已确认保留 ⚠（`riskRetained`）默认折叠在底部审计抽屉，不充数进待办；支持按台账筛选、一键预填未决推荐项、以及对词项/页码/尺寸图组内明细逐条取消勾选。
@@ -122,7 +122,7 @@
 - 导出的决策文件（governance-decisions.json）：<完整路径>
 - 知识库目录（或运行目录）：<完整路径>
 
-先核对项目、修订版与每组决定（含勾选/排除成员和备注），不要改原文件；先给我变更预览，确认后再执行 governance.py collect、按需增量重跑（如 --from guard）和 verify_kb.py，最后汇报剩余待决组数与新增待汇总 CUS。未经确认不要发布或发给客户。
+先核对项目、修订版与每组决定（含勾选/排除成员和备注），不要改原文件；先给我变更预览，确认后再执行 governance_state.py collect、按需增量重跑（如 --from guard）和 verify_kb.py，最后汇报剩余待决组数与新增待汇总 CUS。未经确认不要发布或发给客户。
 ```
 
 ---
@@ -148,7 +148,7 @@
 
 > **浏览器导出的结果文件**：
 > - 客户页导出：**客户反馈 JSON**（留档/续填）+ **CSV**（兼容《客户确认表.csv》，用于写回 `apply_answers.py`）。
-> - 内部页导出：**`governance-decisions.json`**（仅内部，用于 `governance.py collect` 校验应用）。
+> - 内部页导出：**`governance-decisions.json`**（仅内部，用于 `governance_state.py collect` 校验应用）。
 
 ---
 

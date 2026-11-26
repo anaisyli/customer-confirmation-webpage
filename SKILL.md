@@ -1,6 +1,6 @@
 ---
 name: customer-confirmation-webpage
-description: Turn source-backed customer questions (CUS) OR internal enterprise knowledge-base governance triage items (MAT/ANM/TERM/D/CUS) into a standalone, offline HTML decision webpage with embedded evidence and downloadable JSON/CSV feedback. Use `--mode customer` (default) for customer-facing confirmation pages (`交付客户/`) and `--mode internal` for internal-only MAT/ANM/CUS batch decision pages (`内部决策/`, never delivered to customers, exporting `governance-decisions.json` for `governance.py collect`). Do not use to decide answers on behalf of the customer or specialist, contact the customer, or update/publish the knowledge base.
+description: Turn source-backed customer questions (CUS) OR internal enterprise knowledge-base governance triage items (MAT/ANM/TERM/D/CUS) into a standalone, offline HTML decision webpage with embedded evidence and downloadable JSON/CSV feedback. Use `--mode customer` (default) for customer-facing confirmation pages (`交付客户/`) and `--mode internal` for internal-only MAT/ANM/CUS batch decision pages (`内部决策/`, never delivered to customers, exporting `governance-decisions.json` for `governance_state.py collect`). Do not use to decide answers on behalf of the customer or specialist, contact the customer, or update/publish the knowledge base.
 ---
 
 # Customer & Internal Offline Review Webpage
@@ -8,7 +8,7 @@ description: Turn source-backed customer questions (CUS) OR internal enterprise 
 Create a source-grounded, offline single-file HTML decision page in one of two strictly isolated modes:
 
 - **Customer mode (`--mode customer`, default)**: Put each approved customer decision on its own screen with relevant evidence, a plain-language question, and tailored choices; export `customer-feedback.v1` JSON and `客户确认表.csv`. Uses [assets/review-template.html](assets/review-template.html).
-- **Internal mode (`--mode internal`)**: Build an internal-only MAT / ANM / TERM / D / CUS governance decision page (`内部审核专用 · 严禁发给客户`) with dual counts (decision groups vs. audit evidence), collapsed `autoResolved` / `riskRetained` audit drawers, per-group member checkboxes (bulk accept + individual exclusions), recommended actions, and `governance-decisions.v1` JSON export for `governance.py collect`. Uses [assets/internal-review-template.html](assets/internal-review-template.html).
+- **Internal mode (`--mode internal`)**: Build an internal-only MAT / ANM / TERM / D / CUS governance decision page (`内部审核专用 · 严禁发给客户`) with dual counts (decision groups vs. audit evidence), collapsed `autoResolved` / `riskRetained` audit drawers, per-group member checkboxes (bulk accept + individual exclusions), recommended actions, and `governance-decisions.v1` JSON export for `governance_state.py collect`. Uses [assets/internal-review-template.html](assets/internal-review-template.html).
 
 Read [README.md](README.md) for the role-based handoff, copy-ready prompts, file destinations, and what the customer and knowledge specialist each receive. Read [references/data-schema.md](references/data-schema.md) when preparing `questions.json` (`customer-review-input.v1`) or `internal-review.json` (`internal-review-input.v1`). Build either page with `scripts/build_review_page.py`.
 
@@ -81,4 +81,4 @@ Use when the knowledge specialist wants an offline HTML page to review grouped M
    ```
 
 3. Open the generated HTML in a local browser and verify the red/amber `内部审核专用 · 严禁发给客户` banner, KPI dual counts, ledger filters, member checkboxes and image zoom, audit drawers, and `governance-decisions.json` export/import.
-4. Hand the exported `governance-decisions.json` back to `compile-enterprise-knowledge` (`governance.py collect`) to validate, apply, and rerun affected stages; do not modify the vault directly from this skill.
+4. Hand the exported `governance-decisions.json` back to `compile-enterprise-knowledge` (`governance_state.py collect`) to validate, apply, and rerun affected stages; do not modify the vault directly from this skill.
